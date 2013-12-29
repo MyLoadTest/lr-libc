@@ -24,189 +24,18 @@
  *
  */
 
-/**
- * Checks if a file already exists on the filesystem.
- *
- * @param[in] The name of the file to check. Note: Include the full path in the
- *            file name.
- * @return    Returns TRUE (1) if file exists and user has read access to the
- *            file, otherwise function returns FALSE (0).
- */
-int lrlib_file_exists(char* file_name) {
-    int fp; // file pointer
-
-    fp = fopen(file_name, "r+"); // open file in read mode. File must already exist.
-    if (fp == NULL) {
-        return FALSE;
-    } else {
-        fclose(fp);
-        return TRUE;
-    }
-}
-
-#define SEEK_END 9999
-/**
- * Gets the size of a file in bytes
- *
- * Example code:
- *      int size;
- *      size = lrlib_get_file_size("C:\\TEMP\\example.txt");
- *      lr_output_message("The size of the file is: %d", size);
- *
- * Test cases:
- *    * call with empty file name
- *    * call with null file name
- *    * call with file that does not exist
- *    * call with file of known size
- *
- * @param[in] The name of the file to check. Note: Include the full path in the
- *            file name.
- * @return    Returns the size of the file in bytes.
- */
-int lrlib_get_file_size(char* file_name) {
-    int fp; // filestream pointer
-    int size; // file size
-
-    // Check input string
-    if ( (file_name == NULL) || (strlen(file_name) == 0) ) {
-        lr_error_message("File name cannot be null or empty.");
-        lr_abort();
-    }
-
-    // Open the file in binary mode (read-only). File must exist.
-    fp = fopen(file_name, "r+b");
-    if (fp == NULL) {
-        lr_error_message("File must exist to get file size.");
-        lr_abort();
-    }
-
-    // Set the position indicator associated with the stream to the end of the
-    // file. The end of the file is indicated by 2 (SEEK_END), with an offset
-    // of 0 bytes.
-    fseek(fp, 0, 2);
-
-    // ftell is a standard C function that returns the current value of the
-    // position indicator of the stream. For binary streams, this is the number
-    // of bytes from the beginning of the file. This function is undocumented
-    // in the VuGen help file.
-    size = ftell(fp);
-
-    return size;
-}
-
-/**
- * Gets the size of a file in bytes
- *
- * Example code:
- *
- * @param[in] The name of the file to check. Note: Include the full path in the
- *            file name.
- * @return    Returns the size of the file in bytes.
- */
-// Saves a file to the hard disk.
-// Arguments:
-// - file_name: Include the full path in the file name. Note that file must not exist before function is called.
-// - file_content: The data to save to the file. Can be binary or string data.
-// - file_size: The size/length of the data to save to the file. If it is string data, you can find this using strlen(). If you are saving binary data from a web page, use web_get_int_property(HTTP_INFO_DOWNLOAD_SIZE).
-// Returns 0 on success. On failure, function will raise lr_error_message and return -1.
-int lrlib_save_file(char* file_name, void* file_content, unsigned int file_size) {
-    int rc; // function return code
-    int fp; // file pointer
-
-    // Check input values
-    if (file_name == NULL) {
-        lr_error_message("File name is NULL");
-        return -1;
-    } else if (file_content == NULL) {
-        lr_error_message("File content is NULL");
-        return -1;
-    } else if (file_size < 1) {
-        lr_error_message("Invalid file size: %d", file_size);
-        return -1;
-    }
-
-    // Does the file already exist?
-    if (lrlib_file_exists(file_name) == TRUE) {
-        lr_error_message("File %s already exists", file_name);
-        return -1;
-    }
-
-    fp = fopen(file_name, "wb"); // open file in "write, binary" mode.
-    if (fp == NULL) {
-        lr_error_message("Error opening file: %s", file_name);
-        return -1;
-    }
-
-    rc = fwrite(file_content, file_size, 1, fp);
-    if (rc != 1) {
-        lr_error_message("Error writing to file. Items written: %d", rc);
-        return -1;
-    }
-
-    rc = fclose(fp);
-    if (rc != 0) {
-        lr_error_message("Error closing file: %s", file_name);
-        return -1;
-    }
-
-    return 0;
-}
-
-/**
- * Writes a string to the end of a file.
- *
- * TODO: write to file with locking
- * Note: Include the full path in the file name, and escape any slashes. E.g. "C:\\TEMP\\output.txt". Note that file does not have to exist beforehand, but directory does.
- * If attempting to write a single line, include a newline character at the end of the string.
- *
- * @param[in] The name of the file to check. Note: Include the full path in the
- *            file name.
- * @param[in] The string to append to the end of the file.
- * @return    Returns 0 on success. On failure, function will raise lr_error_message and return -1.
- */
-int lrlib_append_to_file(char* file_name, char* string) {
-    int fp; // file pointer
-    int rc; // return code
-    int length = strlen(string);
-
-    // Check that file_name is not NULL.
-    if (file_name == NULL) {
-        lr_error_message("Error. File name is NULL");
-        return -1;
-    }
-
-    fp = fopen(file_name, "a"); // open file in "append" mode.
-    if (fp == NULL) {
-        lr_error_message("Error opening file: %s", file_name);
-        return -1;
-    }
-
-    rc = fprintf(fp, "%s", string);
-    if (rc != length) {
-       lr_error_message("Error writing to file: %s", file_name);
-       return -1;
-    }
-
-    rc = fclose(fp);
-        if (rc != 0) {
-        lr_error_message("Error closing file: %s", file_name);
-        return -1;
-    }
-
-    return 0;
-}
-
-
 #ifdef _WIN32
 /**
- * Pause the execution of the vuser for the specified number of seconds.
+ * Pauses the execution of the vuser for the specified number of seconds. This
+ * think time cannot be ignored by the script's runtime settings.
  *
- * Note: This function only works on Windows
- * Note that this ignores the runtime settings related to think time.
  * TODO: should write to the output log when this is called (what message does lr_think_time() write?
  *
  * @param[in] The time (in seconds) to wait.
  * @return    This function does not return a value.
+ *
+ * Note: This function only works on Windows.
+ * Note: This function ignores the runtime settings related to think time.
  */
 void lrlib_think_time(double time) {
     int rc;
@@ -226,4 +55,13 @@ void lrlib_think_time(double time) {
 }
 #endif
 
-// TODO: add a "generate GUID" function (using the Windows GUIDFromString function)
+// TODO list of functions
+// ======================
+// * functions for VuGen logging levels
+// * popen wrapper function
+// * check PDF function
+// * SHA256 function
+// * check if a port is open
+// * calendar/date functions
+// * read the contents of a file from the filesystem lrlib_read_text_file
+//   (e.g. and then sscanf a number from it)
