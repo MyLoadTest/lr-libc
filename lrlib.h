@@ -49,20 +49,49 @@ int lrlib_file_exists(char* file_name) {
  * Gets the size of a file in bytes
  *
  * Example code:
+ *      int size;
+ *      size = lrlib_get_file_size("C:\\TEMP\\example.txt");
+ *      lr_output_message("The size of the file is: %d", size);
+ *
+ * Test cases:
+ *    * call with empty file name
+ *    * call with null file name
+ *    * call with file that does not exist
+ *    * call with file of known size
  *
  * @param[in] The name of the file to check. Note: Include the full path in the
  *            file name.
  * @return    Returns the size of the file in bytes.
  */
 int lrlib_get_file_size(char* file_name) {
-    // TODO: test for null input
     int fp; // filestream pointer
-    int sz; // file size
-    fp = fopen(file_name, "r+b"); // open in binary mode (read-only). File must exist.
-    fseek(fp, 0, SEEK_END); // sets the position indicator associated with the stream to the end of the file.
-    sz = ftell(fp); // standard C function to return the current value of the position indicator of the stream. For binary streams, this is the number of bytes from the beginning of the file. This function is undocumented in the VuGen help file.
-    lr_output_message("size: %d", sz); // size in bytes
-    return sz;
+    int size; // file size
+
+    // Check input string
+    if ( (file_name == NULL) || (strlen(file_name) == 0) ) {
+        lr_error_message("File name cannot be null or empty.");
+        lr_abort();
+    }
+
+    // Open the file in binary mode (read-only). File must exist.
+    fp = fopen(file_name, "r+b");
+    if (fp == NULL) {
+        lr_error_message("File must exist to get file size.");
+        lr_abort();
+    }
+
+    // Set the position indicator associated with the stream to the end of the
+    // file. The end of the file is indicated by 2 (SEEK_END), with an offset
+    // of 0 bytes.
+    fseek(fp, 0, 2);
+
+    // ftell is a standard C function that returns the current value of the
+    // position indicator of the stream. For binary streams, this is the number
+    // of bytes from the beginning of the file. This function is undocumented
+    // in the VuGen help file.
+    size = ftell(fp);
+
+    return size;
 }
 
 /**
