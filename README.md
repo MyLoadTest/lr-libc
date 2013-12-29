@@ -42,8 +42,15 @@ Finally, **indentation should follow the K&R Style** and **use 4 spaces instead 
 
 Alternatives to lr-libc
 -----------------------
-LoadRunner already includes a large number of userful functions, including most of the standard C library, functions specific to the various vuser types, and other protocol-agnostic functions (starting with "lr_"). Before you spend time writing your own functions, it is worth double-checking to see if HP has already solved your problem.
+LoadRunner already includes a large number of useful functions, including most of the standard C library, functions specific to the various vuser types, and other protocol-agnostic functions (starting with "lr_"). Before you spend time writing your own functions, it is worth double-checking to see if HP has already solved your problem.
 
 Remember that LoadRunner scripts are standard C, so you will be able to find useful code snippets all across the Internet. You can also use functions from third-party DLLs by calling lr_load_dll() from your script.
 
 LoadRunner-specific functions can be found on the HP Software Support website, on various blogs and forums, and in the [Ylib](https://github.com/randakar/y-lib) library by Floris Kraak.
+
+TODO List
+---------
+
+* Automatic documentation generation with Doxygen or Python + [Markdown](https://pypi.python.org/pypi/Markdown) (with fenced code blocks)
+* Add unit test framework (and write some unit tests)
+* Rewrite unit test framework in Python
