@@ -54,3 +54,4 @@ TODO List
 * Automatic documentation generation with Doxygen or Python + [Markdown](https://pypi.python.org/pypi/Markdown) (with fenced code blocks)
 * Add unit test framework (and write some unit tests)
 * Rewrite unit test framework in Python
+* Update functions to log output messages when logging level is set to "advanced trace"
