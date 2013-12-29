@@ -72,8 +72,10 @@ int lrlib_get_file_size(char* file_name) {
     // in the VuGen 11.04 help file.
     size = ftell(fp);
 
+	// Close the filestream
     fclose(fp);
 
+    // Return the size of the file (in bytes)
     return size;
 }
 
@@ -159,52 +161,60 @@ int lrlib_save_file(char* file_name, void* file_content, unsigned int file_size)
         lr_abort();
     }
 
+    // Close the filestream
     fclose(fp);
 
+    // Return the number of blocks written by fwrite
     return bytes;
 }
 
 /**
  * Writes a string to the end of a file.
  *
- * Note: Include the full path in the file name, and escape any slashes. E.g. "C:\\TEMP\\output.txt". Note that file does not have to exist beforehand, but directory does.
- * If attempting to write a single line, include a newline character at the end of the string.
+ * Example code:
+ *     // TODO
  *
  * @param[in] The name of the file to check. Note: Include the full path in the
- *            file name.
- * @param[in] The string to append to the end of the file.
- * @return    Returns 0 on success. On failure, function will raise lr_error_message and return -1.
+ *            file name. and escape any slashes. E.g. "C:\\TEMP\\output.txt".
+ *            Note that file does not have to exist beforehand, but the
+ *            directory does.
+ * @param[in] The string to append to the end of the file. Note: If attempting
+ *            to write a single line, include a newline character at the end
+ *            of the string.
+ * @return    Returns the number of bytes successfully written to the file,
+ *            otherwise an error is raised and the script is aborted.
  */
 int lrlib_append_to_file(char* file_name, char* string) {
-    int fp; // file pointer
     int rc; // return code
+    int fp; // filestream pointer
     int length = strlen(string);
 
-    // Check that file_name is not NULL.
-    if (file_name == NULL) {
-        lr_error_message("Error. File name is NULL");
-        return -1;
-    }
+    // Check input variables
+    if ( (file_name == NULL) || (strlen(file_name) == 0) ) {
+        lr_error_message("File name cannot be NULL or empty.");
+        lr_abort();
 
+    // TODO: will this detect if the directory does not exist?
     fp = fopen(file_name, "a"); // open file in "append" mode.
     if (fp == NULL) {
         lr_error_message("Error opening file: %s", file_name);
-        return -1;
+        lr_abort();
     }
 
+    // fprintf returns the total number of characters written to the stream.
+    // If a writing error occurs, the error indicator (ferror) is set and a
+    // negative number is returned.
     rc = fprintf(fp, "%s", string);
     if (rc != length) {
        lr_error_message("Error writing to file: %s", file_name);
-       return -1;
+       lr_abort();
     }
 
-    rc = fclose(fp);
-        if (rc != 0) {
-        lr_error_message("Error closing file: %s", file_name);
-        return -1;
-    }
+    // Close the filestream
+    fclose(fp);
 
-    return 0;
+    // Return the number of characters written by fprintf
+    return rc;
 }
 
 // TODO list of functions
@@ -212,3 +222,4 @@ int lrlib_append_to_file(char* file_name, char* string) {
 // * append/write to file with locking
 // * read the contents of a file from the filesystem lrlib_read_text_file
 //   (e.g. and then sscanf a number from it)
+// * include the ferror code for file IO error conditions
