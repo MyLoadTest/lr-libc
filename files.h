@@ -72,7 +72,7 @@ int lrlib_get_file_size(char* file_name) {
     // in the VuGen 11.04 help file.
     size = ftell(fp);
 
-	fclose(fp);
+    fclose(fp);
 
     return size;
 }
@@ -105,14 +105,20 @@ int lrlib_get_file_size(char* file_name) {
  *     // And now here is the function that the example is supposed to be for.
  *     lrlib_save_file("C:\\TEMP\\test.pdf", lr_eval_string("{PdfContents}"), pdf_size);
  *
- * @param[in] The name of the file to check. Note: Include the full path in the
- *            file name. Note that if a file with the same name already exists,
- *            it will be silently overwritten.
+ * Test Cases:
+ *     * file_size smaller than file_content
+ *     * file_size greater than file_content
+ *
+ * @param[in] The name of the file to write to. Note: Include the full path in
+ *            the file name. Note that if a file with the same name already
+ *            exists, it will be silently overwritten.
  * @param[in] The data to save to the file. Can be binary or string data.
  * @param[in] The size/length of the data to save to the file. If it is string
  *            data, you can find this using strlen(). If you are saving binary
  *            data from a web page, use
- *            web_get_int_property(HTTP_INFO_DOWNLOAD_SIZE).
+ *            web_get_int_property(HTTP_INFO_DOWNLOAD_SIZE). Note that if the
+ *            binary file is 1000 bytes, and you pass in 100, then only the
+ *            first 100 bytes will be written to the file.
  * @return    Returns the number of bytes successfully written to the file,
  *            otherwise an error is raised and the script is aborted.
  *
@@ -135,34 +141,32 @@ int lrlib_save_file(char* file_name, void* file_content, unsigned int file_size)
         lr_abort();
     }
 
-    // Does the file already exist?
-    //if (lrlib_file_exists(file_name) == TRUE) {
-    //    lr_error_message("File %s already exists", file_name);
-    //    return -1;
-    //}
 
-    // Open file in "write, binary" mode.
+    // Open file in "write, binary" mode. File does not have to already exist.
     fp = fopen(file_name, "wb");
     if (fp == NULL) {
         lr_error_message("Error opening file: %s", file_name);
         lr_abort();
     }
 
-    rc = fwrite(file_content, file_size, 1, fp);
-    if (rc != 1) {
-        lr_error_message("Error writing to file. Items written: %d", rc);
+    // Write to the file (file_size * 1 bytes).
+    // Note that increasing the block size (above 1 byte) does not make writing
+    // the file contents more efficient. The bytes are still written one at a
+    // time to the stream, as if fputc was called for each byte.
+    bytes = fwrite(file_content, 1, file_size, fp);
+    if (bytes != file_size) {
+        lr_error_message("Error writing to file. Bytes written: %d of %d", bytes, file_size);
         lr_abort();
     }
 
     fclose(fp);
 
-    return 0;
+    return bytes;
 }
 
 /**
  * Writes a string to the end of a file.
  *
- * TODO: write to file with locking
  * Note: Include the full path in the file name, and escape any slashes. E.g. "C:\\TEMP\\output.txt". Note that file does not have to exist beforehand, but directory does.
  * If attempting to write a single line, include a newline character at the end of the string.
  *
@@ -206,3 +210,5 @@ int lrlib_append_to_file(char* file_name, char* string) {
 // TODO list of functions
 // ======================
 // * append/write to file with locking
+// * read the contents of a file from the filesystem lrlib_read_text_file
+//   (e.g. and then sscanf a number from it)

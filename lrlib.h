@@ -29,6 +29,10 @@
  * Pauses the execution of the vuser for the specified number of seconds. This
  * think time cannot be ignored by the script's runtime settings.
  *
+ * Example code:
+ *     // This is usually useful when you have a polling loop, and you don't
+ *     // want to poll too quickly
+ *
  * TODO: should write to the output log when this is called (what message does lr_think_time() write?
  *
  * @param[in] The time (in seconds) to wait.
@@ -63,5 +67,3 @@ void lrlib_think_time(double time) {
 // * SHA256 function
 // * check if a port is open
 // * calendar/date functions
-// * read the contents of a file from the filesystem lrlib_read_text_file
-//   (e.g. and then sscanf a number from it)
