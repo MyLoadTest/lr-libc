@@ -125,6 +125,50 @@ int lrlib_sapeventqueue_encode(char* plain_string, char* buf) {
     return buf;
 }
 
+// This function replaces encoded characters from with their non-encoded value.
+// Decoding is in the style of SAP Web Dynpro. E.g. "abc~002Adef" becomes "abd*def".
+// Reserved characters are according to RFC3986 (http://tools.ietf.org/html/rfc3986)
+// This function returns a pointer to the start of the decoded string (buf).
+// Note that buf must be big enough to hold the decoded string (always equal to or shorter than the encoded string).
+char* lrlib_sapeventqueue_decode(char* enc_string, char* buf) {
+    int len = strlen(enc_string);
+    int i, j;
+    char code[3]; // holds url encoded value e.g. "2F" (/)
+    int hex; // decimal value of hex code e.g. 47 (0x2F)
+    int rc; // return code
+
+    if (enc_string == NULL) {
+        lr_error_message("Input string is empty.");
+        return NULL;
+    }
+
+    for (i=0, j=0; i<len; i++, j++) {
+        // Only convert entities that do not start with "~E". Do not run off the end of the string.
+        if ( (enc_string[i] == '~') &&
+                 (enc_string[i+1] != 'E') &&
+                 ((i+4) < len) &&
+                 (enc_string[i+1] == '0') &&
+                 (enc_string[i+2] == '0') &&
+                 (isalpha(enc_string[i+3]) || isdigit(enc_string[i+3])) &&
+                 (isalpha(enc_string[i+4]) || isdigit(enc_string[i+4])) ) {
+            // Get the hex value from the input string
+            code[0] = enc_string[i+3];
+            code[1] = enc_string[i+4];
+            code[3] = NULL;
+            // Convert the hex value to the appropriate character, and add it to buf
+            rc = sscanf(code, "%2x", &hex);
+            if (rc != 1) {
+                lr_error_message("Invalid hex value: %s", code);
+            }
+            buf[j] = hex;
+            i+=4; // skip the rest of this encoded value in the input string
+        } else {
+            buf[j] = enc_string[i];
+        }
+    }
+
+    return buf;
+}
 
 // TODO list of functions
 // ======================
