@@ -78,11 +78,58 @@ int lrlib_str_split(char* string_to_split, char* delimiter, const char* output_p
     return num_pieces;
 }
 
+// This function replaces unreserved characters in a string with their encoded values.
+// Encoding is in the style of SAP Web Dynpro. E.g. "abd*def" becomes "abc~002Adef".
+// Reserved/unreserved characters are according to RFC3986 (http://tools.ietf.org/html/rfc3986)
+// This function returns a pointer to the start of the encoded string (buf).
+// Note that buf must be big enough to hold original string plus all converted entities.
+int lrlib_sapeventqueue_encode(char* plain_string, char* buf) {
+    int len = strlen(plain_string);
+    int i,j;
+    char hex_value[3];
+
+    if (plain_string == NULL) {
+        lr_error_message("Input string is empty.");
+        return NULL;
+    }
+
+    for (i=0, j=0; i<len; i++) {
+        // Check if character is in list of allowed characters.
+        // A B C D E F G H I J K L M N O P Q R S T U V W X Y Z
+        // a b c d e f g h i j k l m n o p q r s t u v w x y z
+        // 0 1 2 3 4 5 6 7 8 9 - _ . ~
+        if ( (plain_string[i] >= 'A' && plain_string[i] <= 'Z') ||
+                 (plain_string[i] >= 'a' && plain_string[i] <= 'z') ||
+                 (plain_string[i] >= '0' && plain_string[i] <= '9') ||
+                 (plain_string[i] == '-') ||
+                 (plain_string[i] == '_') ||
+                 (plain_string[i] == '.') ||
+                 (plain_string[i] == '~') ) {
+
+            buf[j++] = plain_string[i];
+        } else if ( (plain_string[i] < 32 ) || (plain_string[i] > 126) ) {
+            lr_error_message("Input string contains non-printable or non-ASCII character %c at position: %d", plain_string[i], i);
+            return NULL;
+        } else {
+            // The unicode value for use in url encoding is the same as the hex value for the ASCII character
+            itoa(plain_string[i], hex_value, 16);
+            buf[j++] = '~';
+            buf[j++] = '0';
+            buf[j++] = '0';
+            buf[j++] = toupper(hex_value[0]);
+            buf[j++] = toupper(hex_value[1]);
+        }
+    }
+
+    buf[j] = NULL; // terminate the string
+    return buf;
+}
+
+
 // TODO list of functions
 // ======================
 // * replace all occurrances of substring with new string (str_replace). Dont use this instead of web_convert_param to convert to/from URLEncoded or HTML entities.
 // * a "generate GUID" function (using the Windows GUIDFromString function). Alternatively, use lr_param_unique()
 // * trim - remove leading/trailing whitespace from a string.
 // * get a substring between a LB/RB, save to parameter (no ord=All option). match is lazy (not greedy)
-// * sapeventqueue_encode/sapeventqueue_decode
 // * reverse a string
