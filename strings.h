@@ -22,56 +22,59 @@
  *    lrlib_str_split(my_string, ",", "My_ParamArr"); // Memory violation error.
  */
 int lrlib_str_split(char* string_to_split, char* delimiter, const char* output_paramarr_name) {
-	char* token; // a pointer to the current position in the tokenized string.
+    char* token; // a pointer to the current position in the tokenized string.
     int num_pieces; // number of pieces that the string has been split into. This is always at
-					// least 1, as long as the string is not null or zero characters long.
-	char* param_name; // holds the parameter names for each element of the parameter array.
+                    // least 1, as long as the string is not null or zero characters long.
+    char* param_name; // holds the parameter names for each element of the parameter array.
 
     // Check input variables
     if ( (string_to_split == NULL) || (strlen(string_to_split) == 0) ) {
         lr_error_message("string_to_split cannot be NULL or empty.");
         lr_abort();
-	} else if ( (delimiter == NULL) || (strlen(delimiter) == 0) ) {
+    } else if ( (delimiter == NULL) || (strlen(delimiter) == 0) ) {
         lr_error_message("delimiter cannot be NULL or empty.");
         lr_abort();
-	} else if ( (output_paramarr_name == NULL) || (strlen(output_paramarr_name) == 0) ) {
+    } else if ( (output_paramarr_name == NULL) || (strlen(output_paramarr_name) == 0) ) {
         lr_error_message("output_param_name cannot be NULL or empty.");
         lr_abort();
-	}
+    }
 
-	// Allocate memory for the buffer. It must be be large enough to contain the
-	// {ParameterName_count} parameter name.
-	param_name = (char*)malloc(strlen(output_paramarr_name) + strlen("_count"));
-	if (param_name == NULL) {
+    // Allocate memory for the buffer. It must be be large enough to contain the
+    // {ParameterName_count} parameter name.
+    param_name = (char*)malloc(strlen(output_paramarr_name) + strlen("_count"));
+    if (param_name == NULL) {
         lr_error_message("Unable to allocate memory for param_name.");
         lr_abort();
-	}
+    }
 
-	// Note regarding implicit declarations: we do not need to explicitly declare strtok  or strcat
-	// (even though they don't return an int), as we are typecasting its return value, and
-	// sizeof(char*) is the same as sizeof(int).
-	token = (char*)strtok(string_to_split, delimiter); // Get the first token
+    // Note regarding implicit declarations: we do not need to explicitly declare strtok  or strcat
+    // (even though they don't return an int), as we are typecasting its return value, and
+    // sizeof(char*) is the same as sizeof(int).
+    token = (char*)strtok(string_to_split, delimiter); // Get the first token
     if (token == NULL) {
-		// The delimiter was not found in string_to_split, so the entire string is saved to the
-		// output parameter. The output parameter should be called {ParameterName_1}
-		strcpy(param_name, output_paramarr_name);
+        // The delimiter was not found in string_to_split, so the entire string is saved to the
+        // output parameter. The output parameter should be called {ParameterName_1}
+        strcpy(param_name, output_paramarr_name);
         lr_save_string(string_to_split, (char*)strcat(param_name, "_1"));
     }
 
     while (token != NULL) { // While valid tokens are returned.
-		num_pieces++;
-		// Create the {ParameterName_x} parameter for each element of the parameter array.
-		sprintf(param_name, "%s_%d", output_paramarr_name, num_pieces);
-		lr_save_string(token, param_name);
+        num_pieces++;
+        // Create the {ParameterName_x} parameter for each element of the parameter array.
+        sprintf(param_name, "%s_%d", output_paramarr_name, num_pieces);
+        lr_save_string(token, param_name);
         token = (char*)strtok(NULL, delimiter); // Get the next token.
     }
 
-	// Create a {ParameterName_count} parameter, so that the lr_paramarr_* functions may be used.
-	strcpy(param_name, output_paramarr_name);
-	lr_save_int(num_pieces, (char*)strcat(param_name, "_count"));
+    // Create a {ParameterName_count} parameter, so that the lr_paramarr_* functions may be used.
+    strcpy(param_name, output_paramarr_name);
+    lr_save_int(num_pieces, (char*)strcat(param_name, "_count"));
 
-	// Return the numer of pieces that the string was split into. If the delimiter was not found,
-	// then this will be 1.
+    // Free the small amount of memory allocated for the parameter name.
+    free(param_name);
+
+    // Return the numer of pieces that the string was split into. If the delimiter was not found,
+    // then this will be 1.
     return num_pieces;
 }
 
