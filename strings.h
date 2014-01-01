@@ -40,8 +40,8 @@ int lrlib_str_split(char* string_to_split, char* delimiter, const char* output_p
     }
 
     // Allocate memory for the buffer. It must be be large enough to contain the
-    // {ParameterName_count} parameter name.
-    param_name = (char*)malloc(strlen(output_paramarr_name) + strlen("_count"));
+    // {ParameterName_count} parameter name (plus a NULL terminator character).
+    param_name = (char*)malloc(strlen(output_paramarr_name) + strlen("_count") + 1);
     if (param_name == NULL) {
         lr_error_message("Unable to allocate memory for param_name.");
         lr_abort();
