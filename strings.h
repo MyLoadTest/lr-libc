@@ -170,10 +170,63 @@ char* lrlib_sapeventqueue_decode(char* enc_string, char* buf) {
     return buf;
 }
 
+/**
+ * Reverse the order of the characters in a string.
+ *
+ * @param[in] The string that is to be reversed.
+ * @param[in] The name of the parameter to save reversed string to.
+ * @return    Returns nothing. Reversed string is saved to a parameter.
+ *
+ * Example code:
+ *     lr_save_string("abcdefghijklmnopqrstuvwxyz", "Param_StringToReverse");
+ *     lrlib_str_reverse(lr_eval_string("{Param_StringToReverse}"), "Param_ReversedString");
+ *     lr_output_message("Reversed string: %s", lr_eval_string("{Param_ReversedString}"));
+ */
+void lrlib_str_reverse(const char* string_to_reverse, const char* output_param_name) {
+    int i; // loop counter for reversed_string
+    int j; // loop counter for string_to_reverse
+    int length; // length of string_to_reverse (reversed_string will have the same length)
+    char* reversed_string;
+
+    // Check input variables
+    if ( (string_to_reverse == NULL) || (strlen(string_to_reverse) == 0) ) {
+        lr_error_message("string_to_reverse cannot be NULL or empty.");
+        lr_abort();
+    } else if ( (output_param_name == NULL) || (strlen(output_param_name) == 0) ) {
+        lr_error_message("output_param_name cannot be NULL or empty.");
+        lr_abort();
+    }
+
+    // Allocate memory to temporarily hold the reversed string.
+    length = strlen(string_to_reverse);
+    reversed_string = (char*)malloc();
+    if (reversed_string == NULL) {
+        lr_error_message("Unable to allocate memory for reversed_string");
+        lr_abort();
+    }
+
+    // This loop is a little bit complicated, with two counter variables. The i variable counts up
+    // from the start of reversed_string, while the j variable counts down from the end of
+    // string_to_reverse. Both strings will be the same length.
+    for (i=0, j = length-1; i<length; i++, j--) {
+        reversed_string[i] = string_to_reverse[j];
+    }
+    reversed_string[i] = NULL;
+
+    // Save the reversed string to a parameter.
+    lr_save_string(reversed_string, output_param_name);
+
+    // Release the heap memory that was allocated to hold the reversed string.
+    free(reversed_string);
+
+    return;
+}
+
+
 // TODO list of functions
 // ======================
 // * replace all occurrances of substring with new string (str_replace). Dont use this instead of web_convert_param to convert to/from URLEncoded or HTML entities.
 // * a "generate GUID" function (using the Windows GUIDFromString function). Alternatively, use lr_param_unique()
 // * trim - remove leading/trailing whitespace from a string.
 // * get a substring between a LB/RB, save to parameter (no ord=All option). match is lazy (not greedy)
-// * reverse a string
+
