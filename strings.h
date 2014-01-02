@@ -199,7 +199,7 @@ void lrlib_str_reverse(const char* string_to_reverse, const char* output_param_n
 
     // Allocate memory to temporarily hold the reversed string.
     length = strlen(string_to_reverse);
-    reversed_string = (char*)malloc(length);
+    reversed_string = (char*)malloc(length + sizeof(NULL));
     if (reversed_string == NULL) {
         lr_error_message("Unable to allocate memory for reversed_string");
         lr_abort();
