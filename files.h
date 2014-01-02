@@ -72,7 +72,7 @@ int lrlib_get_file_size(char* file_name) {
     // in the VuGen 11.04 help file.
     size = ftell(fp);
 
-	// Close the filestream
+    // Close the filestream
     fclose(fp);
 
     // Return the size of the file (in bytes)
@@ -193,6 +193,7 @@ int lrlib_append_to_file(char* file_name, char* string) {
     if ( (file_name == NULL) || (strlen(file_name) == 0) ) {
         lr_error_message("File name cannot be NULL or empty.");
         lr_abort();
+    }
 
     // TODO: will this detect if the directory does not exist?
     fp = fopen(file_name, "a"); // open file in "append" mode.
@@ -217,9 +218,107 @@ int lrlib_append_to_file(char* file_name, char* string) {
     return rc;
 }
 
+/**
+ * Reads a text file and saves its contents to a parameter.
+ *
+ * @param[in] The name of the file to read Note: Include the full path in the file name. and escape
+ *            any slashes. E.g. "C:\\TEMP\\file.txt".
+ * @param[in] The name of the file to read. Note: Include the full path in the file name.
+ * @return    Returns nothing. Reversed string is saved to a parameter.
+ *
+ * Example code:
+ *         // This code controls pacing time, without using runtime settings. Pacing time can be changed
+ *         // while the script is running by updating the number of seconds in the dynamic_pacing.txt file
+ *         double pacing_time;
+ *         int start_time, end_time, time_taken;
+ *         extern double atof(const char *string); // Explicit declaration
+ *
+ *         start_time = time(NULL);
+ *
+ *         // Insert business process here
+ *
+ *         end_time = time(NULL);
+ *         time_taken = end_time - start_time; // total time spent in business process
+ *
+ *         // Read the number from the text file, and store it in a variable.
+ *         lrlib_read_text_file("C:\\TEMP\\dynamic_pacing.txt", "Param_PacingValue");
+ *         pacing_time = (double)atof(lr_eval_string("{Param_PacingValue}"));
+ *
+ *         // Delay for the amount of time necessary to match the required pacing interval.
+ *         lr_think_time(pacing_time - time_taken);
+ *
+ * Note: the sscanf() function is useful when reading formatted data from a string.
+ * Note: if the file is large, then memory can be freed by calling lr_free_parameter().
+ */
+void lrlib_read_text_file(const char* file_name, const char* output_param_name) {
+    int fp; // filestream pointer
+    int file_size;
+    char* file_contents; // a pointer to a buffer to store the contents of the file
+
+
+    // Check input variables
+    if ( (file_name == NULL) || (strlen(file_name) == 0) ) {
+        lr_error_message("file_name cannot be NULL or empty.");
+        lr_abort();
+    } else if ( (output_param_name == NULL) || (strlen(output_param_name) == 0) ) {
+        lr_error_message("output_param_name cannot be NULL or empty.");
+        lr_abort();
+    }
+
+    // Open the file in binary mode (read-only). File must exist.
+    // Opening in text mode is not advised, as newline characters may be converted.
+    fp = fopen(file_name, "r+b");
+    if (fp == NULL) {
+        lr_error_message("File must already exist to read file contents.");
+        lr_abort();
+    }
+
+    // Set the position indicator associated with the stream to the end of the
+    // file. The end of the file is indicated by 2 (SEEK_END), with an offset
+    // of 0 bytes.
+    fseek(fp, 0, 2);
+
+    // ftell is a standard C function that returns the current value of the
+    // position indicator of the stream. For binary streams, this is the number
+    // of bytes from the beginning of the file. This function is undocumented
+    // in the VuGen 11.04 help file.
+    file_size = ftell(fp);
+
+    // Allocate memory to store the file contents (.
+    file_contents = (char*)malloc(file_size + sizeof(NULL));
+    if (file_contents == NULL) {
+        lr_error_message("Unable to allocate memory for file_contents");
+        lr_abort();
+    }
+
+    // Set the position indicator associated with the stream to the start of the
+    // file. The start of the file is indicated by 0 (SEEK_SET), with an offset
+    // of 0 bytes.
+    fseek(fp, 0, 0);
+
+    // Read the contents of the file
+    fread(file_contents, file_size, file_size, fp);
+
+    file_contents[file_size] = NULL; // Null-terminate
+
+    // Save the file contents to a parameter
+    lr_save_string(file_contents, output_param_name);
+
+    // Close the filestream
+    fclose(fp);
+
+    // Free the memory allocated for the file contents.
+    free(file_contents);
+
+    return;
+}
+
+
+
+
 // TODO list of functions
 // ======================
 // * append/write to file with locking
-// * read the contents of a file from the filesystem lrlib_read_text_file
-//   (e.g. and then sscanf a number from it)
 // * include the ferror code for file IO error conditions
+// * read a single line from a text file (up to newline character). Could use
+//   it with split() function to read CSV data.
