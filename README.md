@@ -1,6 +1,6 @@
 Additional C Functions for LoadRunner
 =====================================
-This is a collection of C functions that I have written for use in LoadRunner scripts.
+This is a collection of C functions that I have written for use in LoadRunner scripts. The official homepage of this library is [http://www.myloadtest.com/tools/loadrunner-function-library/](http://www.myloadtest.com/tools/loadrunner-function-library/)
 
 Documentation
 -------------
@@ -8,7 +8,7 @@ All lr-libc functions have been documented with Doxygen annotations. This allows
 
 Software License
 ----------------
-This library is licensed under the GNU Lesser General Public License ([LGPL](http://en.wikipedia.org/wiki/GNU_Lesser_General_Public_License)) Version 3. You may freely include it in your own LoadRunner scripts with no other requirements or obligations.
+This library is licensed under the GNU Lesser General Public License ([LGPL](http://en.wikipedia.org/wiki/GNU_Lesser_General_Public_License)) Version 3. You may freely include it in your own LoadRunner scripts with no other requirements or obligations. If you redistribute the code (e.g. post it on a forum), you must include a link back to the original source and an author credit.
 
 How to contribute to lr-libc
 ----------------------------
