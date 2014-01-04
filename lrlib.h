@@ -156,7 +156,56 @@ void lrlib_print_log_options(unsigned int log_options_to_print) {
     return;
 }
 
+/**
+ * Writes a message to the replay log, even if logging is disabled.
+ *
+ * @param[in] The message to write to the replay log.
+ * @return    This function does not return a value.
+ *
+ * Example code:
+ *     // Write the current {UserName} parameter to the replay log, even though "send messages
+ *     // only when an error occurs" is enabled.
+ *     lrlib_force_output_message(lr_eval_string("logged in user is {UserName}"));
+ *
+ * Note: The standard lr_output_message function will write to the replay log even when logging is
+ * disabled. The only case where it will not write to the replay log is when "send messages only
+ * when an error occurs" is enabled.
+ * Note: The lr_output_message function supports sprintf-style message formatting. This function
+ * only allows a single string argument. A good work-around for this is to include {Parameters}
+ * in your message, and call the lr_eval_string function, as has been done in the example code.
+ */
+void lrlib_force_output_message(char* output_message) {
+    unsigned int current_log_settings; // the logging settings that were enabled when this
+                                       // function was called.
 
+    // Check input variables
+    if ( (output_message == NULL) || (strlen(output_message) == 0) ) {
+        lr_error_message("output_message cannot be NULL or empty.");
+        lr_abort();
+    }
+
+    // Save the logging settings that were enabled when this function was called.
+    current_log_settings = lr_get_debug_message();
+
+    // If "send messages only when an error occurs" is enabled, then turn it off, otherwise nothing
+    // will be written to the output log.
+    // Note use of the bitwise AND operator. "current_log_settings & LR_MSG_CLASS_JIT_LOG_ON_ERROR"
+    // will evaluate to "LR_MSG_CLASS_JIT_LOG_ON_ERROR" if this setting is enabled.
+    if (current_log_settings & LR_MSG_CLASS_JIT_LOG_ON_ERROR) {
+        lr_set_debug_message(LR_MSG_CLASS_JIT_LOG_ON_ERROR, LR_SWITCH_OFF);
+    }
+
+    // Write the message to the replay log.
+    lr_output_message(output_message);
+
+    // Restore the "send messages only when an error occurs" logging setting if it was
+    // originally enabled.
+    if (current_log_settings & LR_MSG_CLASS_JIT_LOG_ON_ERROR) {
+        lr_set_debug_message(LR_MSG_CLASS_JIT_LOG_ON_ERROR, LR_SWITCH_ON);
+    }
+
+    return;
+}
 
 // TODO list of functions
 // ======================
