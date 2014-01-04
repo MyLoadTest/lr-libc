@@ -24,7 +24,6 @@
  *
  */
 
-#ifdef _WIN32
 /**
  * Pauses the execution of the vuser for the specified number of seconds. This
  * think time cannot be ignored by the script's runtime settings.
@@ -98,6 +97,65 @@ int lrlib_get_vuser_pid() {
     return pid;
 }
 
+/**
+ * Prints log options to the output log.
+ *
+ * @param[in] The logging settings to print. This should be the value returned by
+ *            lr_get_debug_message().
+ * @return    This function does not return a value. The logging settings are printed to the
+ *            replay log.
+ *
+ * Example code:
+ *     // Print the current logging settings to the output log.
+ *     unsigned int log_options;
+ *     log_options = lr_get_debug_message();
+ *     lrlib_print_log_options(log_options);
+ *
+ * Note: The lr_output_message() function will write to the replay log even when logging is
+ * disabled. The only case where it will not write to the replay log is when "send messages only
+ * when an error occurs" is enabled
+ */
+void lrlib_print_log_options(unsigned int log_options_to_print) {
+	unsigned int current_log_settings; // the logging settings that were enabled when this
+									   // function was called.
+    char bit_pattern[(sizeof(int) * 8) + 1]; // this string holds the pattern of bits from the
+											 // unsigned int containing the logging settings.
+
+	// Save the logging settings that were enabled when this function was called.
+	current_log_settings = lr_get_debug_message();
+
+	// Get the bit pattern for the log options that were passed to this function.
+	itoa(log_options_to_print, bit_pattern, 2); //
+
+	// If "send messages only when an error occurs" is enabled, then turn it off, otherwise nothing
+	// will be written to the output log.
+	// Note use of the bitwise AND operator. "current_log_settings & LR_MSG_CLASS_JIT_LOG_ON_ERROR"
+	// will evaluate to "LR_MSG_CLASS_JIT_LOG_ON_ERROR" if this setting is enabled.
+	if (current_log_settings & LR_MSG_CLASS_JIT_LOG_ON_ERROR) {
+		lr_set_debug_message(LR_MSG_CLASS_JIT_LOG_ON_ERROR, LR_SWITCH_OFF);
+	}
+
+    // Print the bit pattern.
+	// Message formatting specifies a string that is 32 characters wide (padded with 0s to the
+	// left of the printed value)
+	lr_output_message("%032.32s", bit_pattern);
+	lr_output_message("                      |    |||||");
+	lr_output_message("                      |    ||||+-LR_MSG_CLASS_BRIEF_LOG (Standard log)");
+	lr_output_message("                      |    |||+--LR_MSG_CLASS_RESULT_DATA (Data returned by server)");
+	lr_output_message("                      |    ||+---LR_MSG_CLASS_PARAMETERS (Parameter substitution)");
+	lr_output_message("                      |    |+----LR_MSG_CLASS_FULL_TRACE (Advanced trace)");
+	lr_output_message("                      |    +-----LR_MSG_CLASS_EXTENDED_LOG (Extended log)");
+	lr_output_message("                      +----------LR_MSG_CLASS_JIT_LOG_ON_ERROR (Send messages only when an error occurs)");
+
+	// Restore the "send messages only when an error occurs" logging setting if it was
+	// originally enabled.
+	if (current_log_settings & LR_MSG_CLASS_JIT_LOG_ON_ERROR) {
+		lr_set_debug_message(LR_MSG_CLASS_JIT_LOG_ON_ERROR, LR_SWITCH_ON);
+	}
+
+    return;
+}
+
 
 // TODO list of functions
 // ======================
@@ -106,3 +164,6 @@ int lrlib_get_vuser_pid() {
 // * SHA256 function
 // * check if a port is open
 // * calendar/date functions
+// * lrlibc_kill_all_mmdrv
+//   see: http://msdn.microsoft.com/en-us/library/windows/desktop/ms684847(v=vs.85).aspx (EnumProcesses, GetProcessId, TerminateProcess)
+// * Add debug trace logging to functions with lr_debug_message(LR_MSG_CLASS_FULL_TRACE, "message");
