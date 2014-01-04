@@ -207,6 +207,102 @@ void lrlib_force_output_message(char* output_message) {
     return;
 }
 
+/**
+ * Sets new logging options to specify what information should be written to the replay log.
+ *
+ * @param[in] The new logging settings to use. Use the same C
+ *       constants as lr_set_debug_message
+ *       (LR_MSG_CLASS_BRIEF_LOG, LR_MSG_CLASS_EXTENDED_LOG
+ *       etc.). Invalid combinations (that are not possible to
+ *       create through the VuGen user interface) are not
+ *       permitted.
+ * @return    This function does not return a value.
+ *
+ * Example code:
+ *     // Increase logging levels just for a short section of code (not the entire script).
+ *     int original_options;
+ *     // Save current logging options.
+ *     original_options = lr_get_log lrlib_set_log_level(LR_MSG_CLASS_EXTENDED_LOG | LR_MSG_CLASS_PARAMETERS | LR_MSG_CLASS_RESULT_DATA | LR_MSG_CLASS_FULL_TRACE);
+ *
+ *     // Put code that you want to get full logging for here (e.g. a step that is failing).
+ *
+ *     // Restore original logging options
+ *     lrlib_set_log_level(original_options);
+ *
+ * Note: It is recommended that you use this function instead of the standard lr_set_debug_message
+ * function. VuGen has an unexpected behaviour where if "send messages only when an error occurs"
+ * is selected in the user interface (even if logging is disabled), then "send messages only when
+ * an error occurs" will be enabled along with the new logging settings, even if it was not
+ * specified in the function argument.
+ */
+void lrlib_set_log_level(unsigned int new_log_options) {
+    int i;
+    int is_valid = FALSE; // are the settings defined in new_log_options valid?
+    int valid_log_settings[] = { // all the possible logging settings available through the GUI
+        LR_MSG_CLASS_DISABLE_LOG,
+        LR_MSG_CLASS_BRIEF_LOG,
+        LR_MSG_CLASS_EXTENDED_LOG,
+        LR_MSG_CLASS_EXTENDED_LOG | LR_MSG_CLASS_PARAMETERS,
+        LR_MSG_CLASS_EXTENDED_LOG | LR_MSG_CLASS_RESULT_DATA,
+        LR_MSG_CLASS_EXTENDED_LOG | LR_MSG_CLASS_PARAMETERS | LR_MSG_CLASS_RESULT_DATA,
+        LR_MSG_CLASS_EXTENDED_LOG | LR_MSG_CLASS_FULL_TRACE,
+        LR_MSG_CLASS_EXTENDED_LOG | LR_MSG_CLASS_PARAMETERS | LR_MSG_CLASS_FULL_TRACE,
+        LR_MSG_CLASS_EXTENDED_LOG | LR_MSG_CLASS_PARAMETERS | LR_MSG_CLASS_RESULT_DATA | LR_MSG_CLASS_FULL_TRACE,
+        LR_MSG_CLASS_JIT_LOG_ON_ERROR | LR_MSG_CLASS_BRIEF_LOG,
+        LR_MSG_CLASS_JIT_LOG_ON_ERROR | LR_MSG_CLASS_EXTENDED_LOG,
+        LR_MSG_CLASS_JIT_LOG_ON_ERROR | LR_MSG_CLASS_EXTENDED_LOG | LR_MSG_CLASS_PARAMETERS,
+        LR_MSG_CLASS_JIT_LOG_ON_ERROR | LR_MSG_CLASS_EXTENDED_LOG | LR_MSG_CLASS_RESULT_DATA,
+        LR_MSG_CLASS_JIT_LOG_ON_ERROR | LR_MSG_CLASS_EXTENDED_LOG | LR_MSG_CLASS_PARAMETERS | LR_MSG_CLASS_RESULT_DATA,
+        LR_MSG_CLASS_JIT_LOG_ON_ERROR | LR_MSG_CLASS_EXTENDED_LOG | LR_MSG_CLASS_FULL_TRACE,
+        LR_MSG_CLASS_JIT_LOG_ON_ERROR | LR_MSG_CLASS_EXTENDED_LOG | LR_MSG_CLASS_PARAMETERS | LR_MSG_CLASS_FULL_TRACE,
+        LR_MSG_CLASS_JIT_LOG_ON_ERROR | LR_MSG_CLASS_EXTENDED_LOG | LR_MSG_CLASS_PARAMETERS | LR_MSG_CLASS_RESULT_DATA | LR_MSG_CLASS_FULL_TRACE
+    };
+
+    // Check wheter the new logging options are valid.
+    for (i=0; i<17; i++) {
+        if (new_log_options == valid_log_settings[i]) {
+            is_valid = TRUE;
+            break;
+        }
+    }
+
+    if(is_valid == FALSE) {
+        lr_error_message("Invalid logging setting. You may use one of the following:\n"
+            "    lrlib_set_log_level(LR_MSG_CLASS_DISABLE_LOG);\n"
+            "    lrlib_set_log_level(LR_MSG_CLASS_BRIEF_LOG);\n"
+            "    lrlib_set_log_level(LR_MSG_CLASS_EXTENDED_LOG);\n"
+            "    lrlib_set_log_level(LR_MSG_CLASS_EXTENDED_LOG | LR_MSG_CLASS_PARAMETERS);\n"
+            "    lrlib_set_log_level(LR_MSG_CLASS_EXTENDED_LOG | LR_MSG_CLASS_RESULT_DATA);\n"
+            "    lrlib_set_log_level(LR_MSG_CLASS_EXTENDED_LOG | LR_MSG_CLASS_PARAMETERS | LR_MSG_CLASS_RESULT_DATA);\n"
+            "    lrlib_set_log_level(LR_MSG_CLASS_EXTENDED_LOG | LR_MSG_CLASS_FULL_TRACE);\n"
+            "    lrlib_set_log_level(LR_MSG_CLASS_EXTENDED_LOG | LR_MSG_CLASS_PARAMETERS | LR_MSG_CLASS_FULL_TRACE);\n"
+            "    lrlib_set_log_level(LR_MSG_CLASS_EXTENDED_LOG | LR_MSG_CLASS_PARAMETERS | LR_MSG_CLASS_RESULT_DATA | LR_MSG_CLASS_FULL_TRACE);\n"
+            "    lrlib_set_log_level(LR_MSG_CLASS_JIT_LOG_ON_ERROR | LR_MSG_CLASS_BRIEF_LOG);\n"
+            "    lrlib_set_log_level(LR_MSG_CLASS_JIT_LOG_ON_ERROR | LR_MSG_CLASS_EXTENDED_LOG);\n"
+            "    lrlib_set_log_level(LR_MSG_CLASS_JIT_LOG_ON_ERROR | LR_MSG_CLASS_EXTENDED_LOG | LR_MSG_CLASS_PARAMETERS);\n"
+            "    lrlib_set_log_level(LR_MSG_CLASS_JIT_LOG_ON_ERROR | LR_MSG_CLASS_EXTENDED_LOG | LR_MSG_CLASS_RESULT_DATA);\n"
+            "    lrlib_set_log_level(LR_MSG_CLASS_JIT_LOG_ON_ERROR | LR_MSG_CLASS_EXTENDED_LOG | LR_MSG_CLASS_PARAMETERS | LR_MSG_CLASS_RESULT_DATA);\n"
+            "    lrlib_set_log_level(LR_MSG_CLASS_JIT_LOG_ON_ERROR | LR_MSG_CLASS_EXTENDED_LOG | LR_MSG_CLASS_FULL_TRACE);\n"
+            "    lrlib_set_log_level(LR_MSG_CLASS_JIT_LOG_ON_ERROR | LR_MSG_CLASS_EXTENDED_LOG | LR_MSG_CLASS_PARAMETERS | LR_MSG_CLASS_FULL_TRACE);\n"
+            "    lrlib_set_log_level(LR_MSG_CLASS_JIT_LOG_ON_ERROR | LR_MSG_CLASS_EXTENDED_LOG | LR_MSG_CLASS_PARAMETERS | LR_MSG_CLASS_RESULT_DATA | LR_MSG_CLASS_FULL_TRACE);"
+        );
+        lr_abort();
+    }
+
+    // Set the new logging options.
+    lr_set_debug_message(LR_MSG_CLASS_DISABLE_LOG, LR_SWITCH_ON); // reset everything to 0
+    lr_set_debug_message(new_log_options, LR_SWITCH_ON); // set the new option
+
+    // If LR_MSG_CLASS_JIT_LOG_ON_ERROR has become set, and it was not specified in
+    // new_log_options, then disable it.
+    if ( (lr_get_debug_message() & LR_MSG_CLASS_JIT_LOG_ON_ERROR) &&
+         !(new_log_options & LR_MSG_CLASS_JIT_LOG_ON_ERROR) ) {
+        lr_set_debug_message(LR_MSG_CLASS_JIT_LOG_ON_ERROR, LR_SWITCH_OFF);
+    }
+
+    return;
+}
+
 // TODO list of functions
 // ======================
 // * popen wrapper function
