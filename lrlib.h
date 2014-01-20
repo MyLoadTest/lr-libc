@@ -1,3 +1,34 @@
+#ifndef PROCESS_TERMINATE
+#define PROCESS_TERMINATE 0x0001
+#endif
+
+#ifndef PROCESS_VM_READ
+#define PROCESS_VM_READ 0x0010
+#endif
+
+#ifndef PROCESS_QUERY_INFORMATION
+#define PROCESS_QUERY_INFORMATION 0x0400
+#endif
+
+#ifndef PROCESS_QUERY_LIMITED_INFORMATION
+#define PROCESS_QUERY_LIMITED_INFORMATION 0x1000
+#endif
+
+#ifndef MAX_PATH
+#define MAX_PATH 260
+#endif
+
+
+void lrlibc_load_dll(const char* dllPath)
+{
+    const int loadResult = lr_load_dll(dllPath);
+    if (loadResult != 0)
+    {
+        lr_error_message("Error loading '%s' (error code %d).", dllPath, loadResult);
+        lr_abort();
+    }
+}
+
 /**
  * @file
  * @author  Stuart Moncrieff <stuart@myloadtest.com>
@@ -302,6 +333,106 @@ void lrlib_set_log_level(unsigned int new_log_options) {
 
     return;
 }
+
+
+int lrlibc_get_process_file_path(const int processId, char* const filePath, const int maxLength)
+{
+    int result;
+
+    const unsigned int hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, processId);
+    if (hProcess == NULL)
+    {
+        *filePath = '\0';
+        return 0;
+    }
+
+    result = GetModuleFileNameExA(hProcess, NULL, filePath, maxLength);
+    if (result == 0)
+    {
+        *filePath = '\0';
+    }
+
+    CloseHandle(hProcess);
+    
+    return result;
+}
+
+
+int lrlibc_kill_all_mmdrv()
+{
+    #define MAX_PROCESS_ID_COUNT 1024
+    
+    unsigned int currentProcessId;
+    unsigned int processIds[MAX_PROCESS_ID_COUNT];
+    const int ELEMENT_SIZE = sizeof(processIds[0]);
+    unsigned int bytesReturned; 
+    int enumResult;
+    int processIdCount;
+    int i;
+    char processFilePath[MAX_PATH];
+    char currentProcessFilePath[MAX_PATH];
+    int res;
+    int killCount = 0;
+    
+    lrlibc_load_dll("kernel32.dll");
+    lrlibc_load_dll("psapi.dll");
+
+    currentProcessId = GetCurrentProcessId();
+    res = lrlibc_get_process_file_path(currentProcessId, currentProcessFilePath, MAX_PATH);
+    if (res <= 0)
+    {
+        lr_error_message("Error querying the current process.");
+        return 0;
+        
+    }
+    
+    enumResult = EnumProcesses(processIds, MAX_PROCESS_ID_COUNT * ELEMENT_SIZE, &bytesReturned);
+    if (!enumResult)
+    {
+        lr_error_message("Error enumerating processes.");
+        return 0;
+    }
+    
+    processIdCount = bytesReturned / ELEMENT_SIZE;
+    for (i = 0; i < processIdCount; i++)
+    {
+        const unsigned int processId = processIds[i];
+        if (processId == currentProcessId)
+        {
+            continue;
+        }
+        
+        res = lrlibc_get_process_file_path(processId, processFilePath, MAX_PATH);
+        if (res <= 0)
+        {
+            continue;
+        }
+        
+        if (stricmp(processFilePath, currentProcessFilePath) != 0)
+        {
+            continue;
+        }
+
+        {
+            const unsigned int hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ | PROCESS_TERMINATE, FALSE, processId);
+            if (hProcess == NULL)
+            {
+                continue;
+            }
+
+            lr_output_message("Killing process %d", processId);
+            if (TerminateProcess(hProcess, 0))
+            {
+                killCount++;
+            }
+            
+            CloseHandle(hProcess);
+        }
+    }
+        
+    return killCount;
+}
+
 
 // TODO list of functions
 // ======================
