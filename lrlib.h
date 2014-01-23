@@ -1,34 +1,3 @@
-#ifndef PROCESS_TERMINATE
-#define PROCESS_TERMINATE 0x0001
-#endif
-
-#ifndef PROCESS_VM_READ
-#define PROCESS_VM_READ 0x0010
-#endif
-
-#ifndef PROCESS_QUERY_INFORMATION
-#define PROCESS_QUERY_INFORMATION 0x0400
-#endif
-
-#ifndef PROCESS_QUERY_LIMITED_INFORMATION
-#define PROCESS_QUERY_LIMITED_INFORMATION 0x1000
-#endif
-
-#ifndef MAX_PATH
-#define MAX_PATH 260
-#endif
-
-
-void lrlibc_load_dll(const char* dllPath)
-{
-    const int loadResult = lr_load_dll(dllPath);
-    if (loadResult != 0)
-    {
-        lr_error_message("Error loading '%s' (error code %d).", dllPath, loadResult);
-        lr_abort();
-    }
-}
-
 /**
  * @file
  * @author  Stuart Moncrieff <stuart@myloadtest.com>
@@ -54,6 +23,57 @@ void lrlibc_load_dll(const char* dllPath)
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
+
+
+#ifndef PROCESS_TERMINATE
+#define PROCESS_TERMINATE 0x0001
+#endif
+
+#ifndef PROCESS_VM_READ
+#define PROCESS_VM_READ 0x0010
+#endif
+
+#ifndef PROCESS_QUERY_INFORMATION
+#define PROCESS_QUERY_INFORMATION 0x0400
+#endif
+
+#ifndef PROCESS_QUERY_LIMITED_INFORMATION
+#define PROCESS_QUERY_LIMITED_INFORMATION 0x1000
+#endif
+
+#ifndef MAX_PATH
+#define MAX_PATH 260
+#endif
+
+#ifndef INFINITE
+#define INFINITE 0xFFFFFFFF
+#endif
+
+#ifndef WAIT_ABANDONED
+#define WAIT_ABANDONED 0x00000080L
+#endif
+
+#ifndef WAIT_OBJECT_0
+#define WAIT_OBJECT_0 0x00000000L
+#endif
+
+void lrlib_load_dll(const char* dllPath)
+{
+    if (dllPath == NULL)
+    {
+        lr_error_message("DLL path cannot be NULL.");
+        lr_abort();        
+    }
+    
+    {
+        const int loadResult = lr_load_dll(dllPath);
+        if (loadResult != 0)
+        {
+            lr_error_message("Error loading '%s' (error code %d).", dllPath, loadResult);
+            lr_abort();
+        }
+    }
+}
 
 /**
  * Pauses the execution of the vuser for the specified number of seconds. This
@@ -335,30 +355,35 @@ void lrlib_set_log_level(unsigned int new_log_options) {
 }
 
 
-int lrlibc_get_process_file_path(const int processId, char* const filePath, const int maxLength)
+int lrlib_get_process_file_path(const int processId, char* const filePath, const int maxLength)
 {
     int result;
 
-    const unsigned int hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, processId);
-    if (hProcess == NULL)
+    lrlib_load_dll("kernel32.dll");
+    lrlib_load_dll("psapi.dll");    
+    
     {
-        *filePath = '\0';
-        return 0;
+        const unsigned int hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, processId);
+        if (hProcess == NULL)
+        {
+            *filePath = '\0';
+            return 0;
+        }
+    
+        result = GetModuleFileNameExA(hProcess, NULL, filePath, maxLength);
+        if (result == 0)
+        {
+            *filePath = '\0';
+        }
+    
+        CloseHandle(hProcess);
     }
-
-    result = GetModuleFileNameExA(hProcess, NULL, filePath, maxLength);
-    if (result == 0)
-    {
-        *filePath = '\0';
-    }
-
-    CloseHandle(hProcess);
     
     return result;
 }
 
 
-int lrlibc_kill_all_mmdrv()
+int lrlib_kill_all_mmdrv()
 {
     #define MAX_PROCESS_ID_COUNT 1024
     
@@ -374,11 +399,11 @@ int lrlibc_kill_all_mmdrv()
     int res;
     int killCount = 0;
     
-    lrlibc_load_dll("kernel32.dll");
-    lrlibc_load_dll("psapi.dll");
+    lrlib_load_dll("kernel32.dll");
+    lrlib_load_dll("psapi.dll");
 
     currentProcessId = GetCurrentProcessId();
-    res = lrlibc_get_process_file_path(currentProcessId, currentProcessFilePath, MAX_PATH);
+    res = lrlib_get_process_file_path(currentProcessId, currentProcessFilePath, MAX_PATH);
     if (res <= 0)
     {
         lr_error_message("Error querying the current process.");
@@ -402,7 +427,7 @@ int lrlibc_kill_all_mmdrv()
             continue;
         }
         
-        res = lrlibc_get_process_file_path(processId, processFilePath, MAX_PATH);
+        res = lrlib_get_process_file_path(processId, processFilePath, MAX_PATH);
         if (res <= 0)
         {
             continue;
@@ -433,6 +458,71 @@ int lrlibc_kill_all_mmdrv()
     return killCount;
 }
 
+int lrlib_append_string_to_text_file_safe(const char* const fileName, const char* const stringToAppend)
+{
+    const char* const MUTEX_NAME = "Local\\lrlib_append_string_to_text_file_safe.060f5f76bc1045cba66f6d43ae8923ff";
+
+    if (fileName == NULL)
+    {
+        lr_error_message("File name cannot be NULL.");
+        lr_abort();        
+        return FALSE;
+    }
+    
+    if (stringToAppend == NULL)
+    {
+        lr_error_message("String to append cannot be NULL.");
+        lr_abort();        
+        return FALSE;
+    }
+    
+    lrlib_load_dll("kernel32.dll");
+
+    {
+        int result = FALSE;
+        unsigned int mutexHandle = CreateMutexA(NULL, FALSE, MUTEX_NAME);
+        if (mutexHandle == NULL)
+        {
+            lr_error_message("Error creating/opening mutex '%s'.", MUTEX_NAME);
+            lr_abort();
+            return FALSE;
+        }
+
+        {
+            const unsigned int waitResult = WaitForSingleObject(mutexHandle, INFINITE);
+            switch (waitResult)
+            {
+                case WAIT_ABANDONED:
+                    CloseHandle(mutexHandle);
+                    lr_error_message("Abandoned mutex '%s' has been acquired.", MUTEX_NAME);
+                    lr_abort();
+                    return FALSE;
+                    
+                case WAIT_OBJECT_0:
+                    break;
+            }
+        }
+        
+        {
+            const long fp = fopen(fileName, "ab");
+            if (fp == NULL)
+            {
+                lr_error_message("Error opening file '%s'.", fileName);
+            }
+            else
+            {
+                fprintf(fp, "%s", stringToAppend);
+                fclose(fp);
+                result = TRUE;
+            }
+        }
+
+        ReleaseMutex(mutexHandle);
+        CloseHandle(mutexHandle);
+
+        return result;
+    }
+}
 
 // TODO list of functions
 // ======================
@@ -441,6 +531,6 @@ int lrlibc_kill_all_mmdrv()
 // * SHA256 function
 // * check if a port is open
 // * calendar/date functions
-// * lrlibc_kill_all_mmdrv
+// * lrlib_kill_all_mmdrv
 //   see: http://msdn.microsoft.com/en-us/library/windows/desktop/ms684847(v=vs.85).aspx (EnumProcesses, GetProcessId, TerminateProcess)
 // * Add debug trace logging to functions with lr_debug_message(LR_MSG_CLASS_FULL_TRACE, "message");
