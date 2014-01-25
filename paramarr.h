@@ -242,6 +242,59 @@ int lrlib_paramarr_push(char* paramarr_name, char* element_to_add) {
     return num_elements + 1;
 }
 
+/**
+ * @brief Removes a parameter array element from the end of the array.
+ *
+ * @param paramarr_name The name of the parameter array to remove the element from.
+ * @param output_param_name The name of a parameter to which the element that has just been removed
+ *        from the array should be saved.
+ * @return Returns the position of the element that was just removed from the parameter array.
+ *
+ * @example:
+ *
+ * Action()
+ * {
+ *     // Simulate the creation of a parameter array.
+ *     // Note: Parameter array are usually created with with web_reg_save_param using ORD=All".
+ *     lr_save_string("one", "MyParamArray_1");
+ *     lr_save_string("two", "MyParamArray_2");
+ *     lr_save_string("three", "MyParamArray_3");
+ *     lr_save_string("3", "MyParamArray_count");
+ *     lr_output_message("There are %d elements in the array.", lr_paramarr_len("MyParamArray"));
+ *
+ *     // Remove an element from the end of the parameter array.
+ *     lrlib_paramarr_pop("MyParamArray", "RemovedElement");
+ *     lr_output_message("Removed %s. There are %d elements in the array.",
+ *         lr_eval_string("{RemovedElement}"), lr_paramarr_len("MyParamArray"));
+ *
+ *     return 0;
+ * }
+ *
+ */
+int lrlib_paramarr_pop(char* paramarr_name, char* output_param_name) {
+    int num_elements;
+    char* element_name = (char*)malloc(strlen(paramarr_name) + strlen("_count") + sizeof(NULL));
+
+    // TODO: Check that the parameter array exists
+    // TODO: what happens when the array is empty?
+
+    num_elements = lr_paramarr_len(paramarr_name);
+
+    // Get the last element of the parameter array, save it to the new parameter,
+    // then delete the element.
+    lr_save_string(lr_paramarr_idx(paramarr_name, num_elements), output_param_name);
+    sprintf(element_name, "%s_%d", paramarr_name, num_elements);
+    lr_free_parameter(element_name);
+
+    // Decrease the parameter element count by 1.
+    sprintf(element_name, "%s_count", paramarr_name);
+    lr_save_int(num_elements - 1, element_name);
+
+    free(element_name);
+
+    return num_elements; // TODO: not sure what the best return value for this function is.
+}
+
 // Note existing LoadRunner functions:
 // * lr_paramarr_idx
 // * lr_paramarr_len
