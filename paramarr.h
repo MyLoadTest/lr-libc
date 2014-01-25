@@ -93,6 +93,53 @@ int lrlib_paramarr_delete(char* paramarr_name) {
     return i; // total number of elements in the parameter array.
 }
 
+/**
+ * @brief Checks whether a LoadRunner parameter array contains a particular string element.
+ *
+ * @param paramarr_name The name of the parameter array to search.
+ * @param element_to_find The string to find in the parameter array.
+ * @return Returns TRUE (1) if the element was found in the parameter arry, otherwise returns
+ *         FALSE (0).
+ *
+ * @example:
+ *
+ * Action()
+ * {
+ *     // Simulate the creation of a parameter array.
+ *     // Note: Parameter array are usually created with with web_reg_save_param using ORD=All".
+ *     lr_save_string("one", "MyParamArray_1");
+ *     lr_save_string("two", "MyParamArray_2");
+ *     lr_save_string("three", "MyParamArray_3");
+ *     lr_save_string("3", "MyParamArray_count");
+ *
+ *     // Check to see if "two" is in the parameter array
+ *     if(lrlib_paramarr_contains("MyParamArray", "two") ==  TRUE) {
+ *         lr_output_message("Found element in parameter array.");
+ *     } else {
+ *         lr_output_message("Could not find element.");
+ *     }
+ *
+ *     return 0;
+ * }
+ *
+ */
+int lrlib_paramarr_contains(char* paramarr_name, char* element_to_find) {
+    int i;
+    int num_elements;
+    int element_found = FALSE;
+
+    // TODO: Check that the parameter array exists
+
+    num_elements = lr_paramarr_len(paramarr_name);
+    for(i=1; i<=num_elements; i++) {
+        if (strcmp(lr_paramarr_idx(paramarr_name, i), element_to_find) == 0) {
+            element_found = TRUE;
+            break;
+        }
+    }
+
+    return element_found;
+}
 
 // Note existing LoadRunner functions:
 // * lr_paramarr_idx
@@ -104,7 +151,6 @@ int lrlib_paramarr_delete(char* paramarr_name) {
 // Note that there are already some functions in the strings.h library.
 
 // lrlib_paramarr_unique(param_arr_name, new_param_arr_name). Takes a parameter array, and creates a new parameter array containing only unique values. Note: can implement this the inefficient way, as parameter arrays are generally not large.
-// lrlib_paramarr_contains() - returns true of false
 // lrlib_paramarr_search() - returns the key number, kind of the opposite of lr_paramarr_idx
 // lrlib_paramarr_join(paramarr_name, delimiter)
 // lrlib_paramarr_next() -- can use for loop iterator. static variable keeps track of place in loop. returns true while there is still elements.
@@ -114,5 +160,3 @@ int lrlib_paramarr_delete(char* paramarr_name) {
 
 //TODO: how to save a binary blob (containing nulls) to a paramater. lr_save_var?
 // TODO: What is max amount of heap memory that can be used when allocating large parameters?
-
-
