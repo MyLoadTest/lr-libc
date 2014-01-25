@@ -142,7 +142,7 @@ int lrlib_paramarr_contains(char* paramarr_name, char* element_to_find) {
 }
 
 /**
- * @brief Finds the position of a string element in a a LoadRunner parameter array.
+ * @brief Finds the position of a string element in a LoadRunner parameter array.
  *
  * @param paramarr_name The name of the parameter array to search.
  * @param element_to_find The string to find in the parameter array.
@@ -193,7 +193,54 @@ int lrlib_paramarr_search(char* paramarr_name, char* element_to_find) {
     return element_found;
 }
 
+/**
+ * @brief Adds an element to the end of a LoadRunner parameter array.
+ *
+ * @param paramarr_name The name of the parameter array to add the element to.
+ * @param element_to_add The string to add to the end of the parameter array.
+ * @return Returns the position of the element that was just added to the parameter array.
+ *         Note: this is also the new array length.
+ *
+ * @example:
+ *
+ * Action()
+ * {
+ *     // Simulate the creation of a parameter array.
+ *     // Note: Parameter array are usually created with with web_reg_save_param using ORD=All".
+ *     lr_save_string("one", "MyParamArray_1");
+ *     lr_save_string("two", "MyParamArray_2");
+ *     lr_save_string("three", "MyParamArray_3");
+ *     lr_save_string("3", "MyParamArray_count");
+ *     lr_output_message("There are %d elements in the array.", lr_paramarr_len("MyParamArray"));
+ *
+ *     // Add an element to the end of the parameter array.
+ *     lrlib_paramarr_push("MyParamArray", "four");
+ *     lr_output_message("There are %d elements in the array.", lr_paramarr_len("MyParamArray"));
+ *
+ *     return 0;
+ * }
+ *
+ */
+int lrlib_paramarr_push(char* paramarr_name, char* element_to_add) {
+    int num_elements;
+    char* element_name = (char*)malloc(strlen(paramarr_name) + strlen("_count") + sizeof(NULL));
 
+    // TODO: Check that the parameter array exists
+
+    num_elements = lr_paramarr_len(paramarr_name);
+
+    // Add the new element to the end of the array.
+    sprintf(element_name, "%s_%d", paramarr_name, num_elements + 1);
+    lr_save_string(element_to_add, element_name);
+
+    // Increase the parameter element count by 1.
+    sprintf(element_name, "%s_count", paramarr_name);
+    lr_save_int(num_elements + 1, element_name);
+
+    free(element_name);
+
+    return num_elements + 1;
+}
 
 // Note existing LoadRunner functions:
 // * lr_paramarr_idx
