@@ -46,6 +46,53 @@ int lrlib_paramarr_create(const char* paramarr_name, ...) {
     return i; // total number of elements in the parameter array.
 }
 
+/**
+ *  @brief Delete a LoadRunner parameter array
+ *
+ *  @note The lr_free_parameter function does not work with
+ *        parameter arrays. You can use it to delete array
+ *        elements, but not the whole array at once.
+ *
+ *  @param paramarr_name The name of the parameter array to
+ *                       delete.
+ *  @return    Returns the number of array elements that were
+ *             deleted (including the _count array element).
+ *
+ * @example:
+ *
+ * Action()
+ * {
+ *     // Simulate the creation of a parameter array.
+ *     // Note: Parameter array are usually created with with web_reg_save_param using ORD=All".
+ *     lr_save_string("one", "MyParamArray_1");
+ *     lr_save_string("two", "MyParamArray_2");
+ *     lr_save_string("three", "MyParamArray_3");
+ *     lr_save_string("3", "MyParamArray_count");
+ *
+ *     // Delete all elements of the parameter array
+ *     lrlib_paramarr_delete("MyParamArray");
+ *
+ *     return 0;
+ * }
+ *
+ */
+int lrlib_paramarr_delete(char* paramarr_name) {
+    int i;
+    int num_elements;
+    char* element_name = (char*)malloc(strlen(paramarr_name) + strlen("_count") + sizeof(NULL));
+
+    // TODO: Check that the parameter array exists
+
+    num_elements = lr_paramarr_len(paramarr_name);
+    for(i=1; i<=num_elements; i++) {
+        sprintf(element_name, "%s_%d", paramarr_name, i);
+        lr_free_parameter(element_name);
+    }
+    sprintf(element_name, "%s_count", paramarr_name);
+    lr_free_parameter(element_name);
+
+    return i; // total number of elements in the parameter array.
+}
 
 
 // Note existing LoadRunner functions:
@@ -64,8 +111,8 @@ int lrlib_paramarr_create(const char* paramarr_name, ...) {
 // lrlib_paramarr_shuffle() - could use shuffle then next, to make sure you don't get repeats (which you would get with random)
 // lrlib_paramarr_diff
 // lrlib_paramarr_intersect
-// lrlib_paramarr_delete() - lr_free_parameter does not work with parameter arrays. You can use it to delete array elements, but not the whole array at once.
-// lrlib_paramarr_create()  -convert an array of char*s to a LoadRunner parameter array.
+// lrlib_paramarr_delete() -
+
 
 //TODO: how to save a binary blob (containing nulls) to a paramater. lr_save_var?
 // TODO: What is max amount of heap memory that can be used when allocating large parameters?
