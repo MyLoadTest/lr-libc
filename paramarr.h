@@ -47,16 +47,14 @@ int lrlib_paramarr_create(const char* paramarr_name, ...) {
 }
 
 /**
- *  @brief Delete a LoadRunner parameter array
+ * @brief Deletes a LoadRunner parameter array
  *
- *  @note The lr_free_parameter function does not work with
- *        parameter arrays. You can use it to delete array
- *        elements, but not the whole array at once.
+ * @note The lr_free_parameter function does not work with parameter arrays. You can use it to
+ *       delete array elements, but not the whole array at once.
  *
- *  @param paramarr_name The name of the parameter array to
- *                       delete.
- *  @return    Returns the number of array elements that were
- *             deleted (including the _count array element).
+ * @param paramarr_name The name of the parameter array to delete.
+ * @return Returns the number of array elements that were deleted (including the _count array
+ *         element).
  *
  * @example:
  *
@@ -91,6 +89,7 @@ int lrlib_paramarr_delete(char* paramarr_name) {
     sprintf(element_name, "%s_count", paramarr_name);
     lr_free_parameter(element_name);
 
+    free(element_name);
     return i; // total number of elements in the parameter array.
 }
 
@@ -100,6 +99,7 @@ int lrlib_paramarr_delete(char* paramarr_name) {
 // * lr_paramarr_len
 // * lr_paramarr_random
 // * lr_param_increment
+// * lr_free_parameter
 
 // Note that there are already some functions in the strings.h library.
 
@@ -111,8 +111,6 @@ int lrlib_paramarr_delete(char* paramarr_name) {
 // lrlib_paramarr_shuffle() - could use shuffle then next, to make sure you don't get repeats (which you would get with random)
 // lrlib_paramarr_diff
 // lrlib_paramarr_intersect
-// lrlib_paramarr_delete() -
-
 
 //TODO: how to save a binary blob (containing nulls) to a paramater. lr_save_var?
 // TODO: What is max amount of heap memory that can be used when allocating large parameters?
