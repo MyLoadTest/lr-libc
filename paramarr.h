@@ -1,6 +1,6 @@
 
 /**
- * @brief Create a new LoadRunner parameter array from a list of strings.
+ * @brief Creates a new LoadRunner parameter array from a list of strings.
  *
  * @param paramarr_name The name of the new parameter array.
  * @param paramarr_elements The elements of the new parameter array (the parameter array must have
@@ -141,6 +141,60 @@ int lrlib_paramarr_contains(char* paramarr_name, char* element_to_find) {
     return element_found;
 }
 
+/**
+ * @brief Finds the position of a string element in a a LoadRunner parameter array.
+ *
+ * @param paramarr_name The name of the parameter array to search.
+ * @param element_to_find The string to find in the parameter array.
+ * @return Returns the position of the element in the array (first element is 1). If the element
+ *         is not found, the function returns 0.
+ *
+ * @example:
+ *
+ * Action()
+ * {
+ *     int position;
+ *
+ *     // Simulate the creation of a parameter array.
+ *     // Note: Parameter array are usually created with with web_reg_save_param using ORD=All".
+ *     lr_save_string("one", "MyParamArray_1");
+ *     lr_save_string("two", "MyParamArray_2");
+ *     lr_save_string("three", "MyParamArray_3");
+ *     lr_save_string("3", "MyParamArray_count");
+ *
+ *     // At what position is "two" in the parameter array?
+ *     position = lrlib_paramarr_search("MyParamArray", "two");
+ *     if(position > 0) {
+ *         lr_output_message("Found element %s in parameter array at position %d.",
+ *             lr_paramarr_idx("MyParamArray", position), position);
+ *     } else {
+ *         lr_output_message("Could not find element.");
+ *     }
+ *
+ *     return 0;
+ * }
+ *
+ */
+int lrlib_paramarr_search(char* paramarr_name, char* element_to_find) {
+    int i;
+    int num_elements;
+    int element_found = FALSE;
+
+    // TODO: Check that the parameter array exists
+
+    num_elements = lr_paramarr_len(paramarr_name);
+    for(i=1; i<=num_elements; i++) {
+        if (strcmp(lr_paramarr_idx(paramarr_name, i), element_to_find) == 0) {
+            element_found = TRUE;
+            break;
+        }
+    }
+
+    return element_found;
+}
+
+
+
 // Note existing LoadRunner functions:
 // * lr_paramarr_idx
 // * lr_paramarr_len
@@ -151,12 +205,12 @@ int lrlib_paramarr_contains(char* paramarr_name, char* element_to_find) {
 // Note that there are already some functions in the strings.h library.
 
 // lrlib_paramarr_unique(param_arr_name, new_param_arr_name). Takes a parameter array, and creates a new parameter array containing only unique values. Note: can implement this the inefficient way, as parameter arrays are generally not large.
-// lrlib_paramarr_search() - returns the key number, kind of the opposite of lr_paramarr_idx
 // lrlib_paramarr_join(paramarr_name, delimiter)
 // lrlib_paramarr_next() -- can use for loop iterator. static variable keeps track of place in loop. returns true while there is still elements.
 // lrlib_paramarr_shuffle() - could use shuffle then next, to make sure you don't get repeats (which you would get with random)
 // lrlib_paramarr_diff
 // lrlib_paramarr_intersect
+
 
 //TODO: how to save a binary blob (containing nulls) to a paramater. lr_save_var?
 // TODO: What is max amount of heap memory that can be used when allocating large parameters?
