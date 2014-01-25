@@ -24,6 +24,57 @@
  *
  */
 
+
+#ifndef PROCESS_TERMINATE
+#define PROCESS_TERMINATE 0x0001
+#endif
+
+#ifndef PROCESS_VM_READ
+#define PROCESS_VM_READ 0x0010
+#endif
+
+#ifndef PROCESS_QUERY_INFORMATION
+#define PROCESS_QUERY_INFORMATION 0x0400
+#endif
+
+#ifndef PROCESS_QUERY_LIMITED_INFORMATION
+#define PROCESS_QUERY_LIMITED_INFORMATION 0x1000
+#endif
+
+#ifndef MAX_PATH
+#define MAX_PATH 260
+#endif
+
+#ifndef INFINITE
+#define INFINITE 0xFFFFFFFF
+#endif
+
+#ifndef WAIT_ABANDONED
+#define WAIT_ABANDONED 0x00000080L
+#endif
+
+#ifndef WAIT_OBJECT_0
+#define WAIT_OBJECT_0 0x00000000L
+#endif
+
+void lrlib_load_dll(const char* dllPath)
+{
+    if (dllPath == NULL)
+    {
+        lr_error_message("DLL path cannot be NULL.");
+        lr_abort();        
+    }
+    
+    {
+        const int loadResult = lr_load_dll(dllPath);
+        if (loadResult != 0)
+        {
+            lr_error_message("Error loading '%s' (error code %d).", dllPath, loadResult);
+            lr_abort();
+        }
+    }
+}
+
 /**
  * Pauses the execution of the vuser for the specified number of seconds. This
  * think time cannot be ignored by the script's runtime settings.
@@ -303,6 +354,176 @@ void lrlib_set_log_level(unsigned int new_log_options) {
     return;
 }
 
+
+int lrlib_get_process_file_path(const int processId, char* const filePath, const int maxLength)
+{
+    int result;
+
+    lrlib_load_dll("kernel32.dll");
+    lrlib_load_dll("psapi.dll");    
+    
+    {
+        const unsigned int hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, processId);
+        if (hProcess == NULL)
+        {
+            *filePath = '\0';
+            return 0;
+        }
+    
+        result = GetModuleFileNameExA(hProcess, NULL, filePath, maxLength);
+        if (result == 0)
+        {
+            *filePath = '\0';
+        }
+    
+        CloseHandle(hProcess);
+    }
+    
+    return result;
+}
+
+
+int lrlib_kill_all_mmdrv()
+{
+    #define MAX_PROCESS_ID_COUNT 1024
+    
+    unsigned int currentProcessId;
+    unsigned int processIds[MAX_PROCESS_ID_COUNT];
+    const int ELEMENT_SIZE = sizeof(processIds[0]);
+    unsigned int bytesReturned; 
+    int enumResult;
+    int processIdCount;
+    int i;
+    char processFilePath[MAX_PATH];
+    char currentProcessFilePath[MAX_PATH];
+    int res;
+    int killCount = 0;
+    
+    lrlib_load_dll("kernel32.dll");
+    lrlib_load_dll("psapi.dll");
+
+    currentProcessId = GetCurrentProcessId();
+    res = lrlib_get_process_file_path(currentProcessId, currentProcessFilePath, MAX_PATH);
+    if (res <= 0)
+    {
+        lr_error_message("Error querying the current process.");
+        return 0;
+        
+    }
+    
+    enumResult = EnumProcesses(processIds, MAX_PROCESS_ID_COUNT * ELEMENT_SIZE, &bytesReturned);
+    if (!enumResult)
+    {
+        lr_error_message("Error enumerating processes.");
+        return 0;
+    }
+    
+    processIdCount = bytesReturned / ELEMENT_SIZE;
+    for (i = 0; i < processIdCount; i++)
+    {
+        const unsigned int processId = processIds[i];
+        if (processId == currentProcessId)
+        {
+            continue;
+        }
+        
+        res = lrlib_get_process_file_path(processId, processFilePath, MAX_PATH);
+        if (res <= 0)
+        {
+            continue;
+        }
+        
+        if (stricmp(processFilePath, currentProcessFilePath) != 0)
+        {
+            continue;
+        }
+
+        {
+            const unsigned int hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ | PROCESS_TERMINATE, FALSE, processId);
+            if (hProcess == NULL)
+            {
+                continue;
+            }
+
+            lr_output_message("Killing process %d", processId);
+            if (TerminateProcess(hProcess, 0))
+            {
+                killCount++;
+            }
+            
+            CloseHandle(hProcess);
+        }
+    }
+        
+    return killCount;
+}
+
+int lrlib_append_string_to_text_file_safe(const char* const fileName, const char* const stringToAppend)
+{
+    const char* const MUTEX_NAME = "Local\\lrlib_append_string_to_text_file_safe.060f5f76bc1045cba66f6d43ae8923ff";
+
+    if (fileName == NULL)
+    {
+        lr_error_message("File name cannot be NULL.");
+        lr_abort();        
+        return FALSE;
+    }
+    
+    if (stringToAppend == NULL)
+    {
+        lr_error_message("String to append cannot be NULL.");
+        lr_abort();        
+        return FALSE;
+    }
+    
+    lrlib_load_dll("kernel32.dll");
+
+    {
+        int result = FALSE;
+        unsigned int mutexHandle = CreateMutexA(NULL, FALSE, MUTEX_NAME);
+        if (mutexHandle == NULL)
+        {
+            lr_error_message("Error creating/opening mutex '%s'.", MUTEX_NAME);
+            lr_abort();
+            return FALSE;
+        }
+
+        {
+            const unsigned int waitResult = WaitForSingleObject(mutexHandle, INFINITE);
+            switch (waitResult)
+            {
+                case WAIT_ABANDONED:
+                    CloseHandle(mutexHandle);
+                    lr_error_message("Abandoned mutex '%s' has been acquired.", MUTEX_NAME);
+                    lr_abort();
+                    return FALSE;
+                    
+                case WAIT_OBJECT_0:
+                    break;
+            }
+        }
+        
+        {
+            const long fp = fopen(fileName, "ab");
+            if (fp == NULL)
+            {
+                lr_error_message("Error opening file '%s'.", fileName);
+            }
+            else
+            {
+                fprintf(fp, "%s", stringToAppend);
+                fclose(fp);
+                result = TRUE;
+            }
+        }
+
+        ReleaseMutex(mutexHandle);
+        CloseHandle(mutexHandle);
+
+        return result;
+    }
+}
+
 // TODO list of functions
 // ======================
 // * popen wrapper function
@@ -310,6 +531,6 @@ void lrlib_set_log_level(unsigned int new_log_options) {
 // * SHA256 function
 // * check if a port is open
 // * calendar/date functions
-// * lrlibc_kill_all_mmdrv
+// * lrlib_kill_all_mmdrv
 //   see: http://msdn.microsoft.com/en-us/library/windows/desktop/ms684847(v=vs.85).aspx (EnumProcesses, GetProcessId, TerminateProcess)
 // * Add debug trace logging to functions with lr_debug_message(LR_MSG_CLASS_FULL_TRACE, "message");
