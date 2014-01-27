@@ -86,9 +86,9 @@ void lrlib_load_dll(const char* dllPath)
     if (dllPath == NULL)
     {
         lr_error_message("DLL path cannot be NULL.");
-        lr_abort();        
+        lr_abort();
     }
-    
+
     {
         const int loadResult = lr_load_dll(dllPath);
         if (loadResult != 0)
@@ -97,6 +97,60 @@ void lrlib_load_dll(const char* dllPath)
             lr_abort();
         }
     }
+}
+
+
+/**
+ * @brief Creates a new UUID and saves its string representation to a parameter with the specified name.
+ *
+ * @param output_param_name The name of the parameter to save a created UUID to.
+ * @return Returns TRUE (1) if the function succeeded; otherwise, returns FALSE (0).
+ */
+int lrlib_create_uuid(const char* output_param_name)
+{
+    const char* LIB_NAME = "Rpcrt4.dll";
+    const int GUID_SIZE = 16;
+    int rpcStatus;
+
+    char* guid;
+    unsigned char* str;
+
+    const int loadResult = lr_load_dll(LIB_NAME);
+    if (loadResult != 0)
+    {
+        lr_error_message("Error loading '%s' (error code %d).", LIB_NAME, loadResult);
+        return FALSE;
+    }
+
+    guid = (char*)calloc(GUID_SIZE, 1);
+    if (!guid)
+    {
+        lr_error_message("Error allocating memory.");
+        return FALSE;
+    }
+
+    rpcStatus = UuidCreate(guid);
+    if (rpcStatus != 0)
+    {
+        lr_error_message("Error creating UUID (%d).", rpcStatus);
+        free(guid);
+        return FALSE;
+    }
+
+    rpcStatus = UuidToStringA(guid, &str);
+    if (rpcStatus != 0)
+    {
+        lr_error_message("Error converting UUID to string (%d).", rpcStatus);
+        free(guid);
+        return FALSE;
+    }
+
+    lr_save_string((char*)str, output_param_name);
+
+    RpcStringFreeA(&str);
+    free(guid);
+
+    return TRUE;
 }
 
 /**
@@ -378,14 +432,13 @@ void lrlib_set_log_level(unsigned int new_log_options) {
     return;
 }
 
-
 int lrlib_get_process_file_path(const int processId, char* const filePath, const int maxLength)
 {
     int result;
 
     lrlib_load_dll("kernel32.dll");
-    lrlib_load_dll("psapi.dll");    
-    
+    lrlib_load_dll("psapi.dll");
+
     {
         const unsigned int hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, processId);
         if (hProcess == NULL)
@@ -393,24 +446,23 @@ int lrlib_get_process_file_path(const int processId, char* const filePath, const
             *filePath = '\0';
             return 0;
         }
-    
+
         result = GetModuleFileNameExA(hProcess, NULL, filePath, maxLength);
         if (result == 0)
         {
             *filePath = '\0';
         }
-    
+
         CloseHandle(hProcess);
     }
-    
+
     return result;
 }
-
 
 int lrlib_kill_all_mmdrv()
 {
     #define MAX_PROCESS_ID_COUNT 1024
-    
+
     unsigned long currentProcessId;
     unsigned long processIds[MAX_PROCESS_ID_COUNT];
     const long ELEMENT_SIZE = sizeof(processIds[0]);
@@ -420,9 +472,9 @@ int lrlib_kill_all_mmdrv()
     long i;
     char processFilePath[MAX_PATH];
     char currentProcessFilePath[MAX_PATH];
-    long res;
+    int res;
     int killCount = 0;
-    
+
     lrlib_load_dll("kernel32.dll");
     lrlib_load_dll("psapi.dll");
 
@@ -432,16 +484,15 @@ int lrlib_kill_all_mmdrv()
     {
         lr_error_message("Error querying the current process.");
         return 0;
-        
     }
-    
+
     enumResult = EnumProcesses(processIds, MAX_PROCESS_ID_COUNT * ELEMENT_SIZE, &bytesReturned);
     if (!enumResult)
     {
         lr_error_message("Error enumerating processes.");
         return 0;
     }
-    
+
     processIdCount = bytesReturned / ELEMENT_SIZE;
     for (i = 0; i < processIdCount; i++)
     {
@@ -450,13 +501,13 @@ int lrlib_kill_all_mmdrv()
         {
             continue;
         }
-        
+
         res = lrlib_get_process_file_path(processId, processFilePath, MAX_PATH);
         if (res <= 0)
         {
             continue;
         }
-        
+
         if (stricmp(processFilePath, currentProcessFilePath) != 0)
         {
             continue;
@@ -474,77 +525,12 @@ int lrlib_kill_all_mmdrv()
             {
                 killCount++;
             }
-            
+
             CloseHandle(hProcess);
         }
     }
-        
+
     return killCount;
-}
-
-int lrlib_append_string_to_text_file_safe(const char* const fileName, const char* const stringToAppend)
-{
-    const char* const MUTEX_NAME = "Local\\lrlib_append_string_to_text_file_safe.060f5f76bc1045cba66f6d43ae8923ff";
-
-    if (fileName == NULL)
-    {
-        lr_error_message("File name cannot be NULL.");
-        lr_abort();
-        return FALSE;
-    }
-    
-    if (stringToAppend == NULL)
-    {
-        lr_error_message("String to append cannot be NULL.");
-        lr_abort();
-        return FALSE;
-    }
-    
-    lrlib_load_dll("kernel32.dll");
-
-    {
-        int result = FALSE;
-        unsigned long mutexHandle = CreateMutexA(NULL, FALSE, MUTEX_NAME);
-        if (mutexHandle == NULL)
-        {
-            lr_error_message("Error creating/opening mutex '%s'.", MUTEX_NAME);
-            lr_abort();
-            return FALSE;
-        }
-
-        {
-            const unsigned long waitResult = WaitForSingleObject(mutexHandle, INFINITE);
-            switch (waitResult)
-            {
-                case WAIT_ABANDONED:
-                    CloseHandle(mutexHandle);
-                    lr_error_message("Abandoned mutex '%s' has been acquired.", MUTEX_NAME);
-                    return FALSE;
-                    
-                case WAIT_OBJECT_0:
-                    break;
-            }
-        }
-        
-        {
-            const long fp = fopen(fileName, "ab");
-            if (fp == NULL)
-            {
-                lr_error_message("Error opening file '%s'.", fileName);
-            }
-            else
-            {
-                fprintf(fp, "%s", stringToAppend);
-                fclose(fp);
-                result = TRUE;
-            }
-        }
-
-        ReleaseMutex(mutexHandle);
-        CloseHandle(mutexHandle);
-
-        return result;
-    }
 }
 
 int lrlib_get_perfmon_counter_list(char* outputParamArr)
