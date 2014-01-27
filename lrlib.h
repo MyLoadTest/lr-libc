@@ -57,6 +57,30 @@
 #define WAIT_OBJECT_0 0x00000000L
 #endif
 
+#ifndef ERROR_SUCCESS
+#define ERROR_SUCCESS 0L
+#endif
+
+#ifndef PDH_MORE_DATA
+#define PDH_MORE_DATA 0x800007D2L
+#endif
+
+#ifndef PERF_DETAIL_WIZARD
+#define PERF_DETAIL_WIZARD 400
+#endif
+
+#ifndef PDH_STATUS
+#define PDH_STATUS long
+#endif
+
+
+/* LRLIB defines */
+
+#define LRLIB_MAX_PARAM_NAME_LENGTH 200
+#define LRLIB_MAX_SUFFIX_LENGTH 20
+#define LRLIB_PARAM_NAME_BUFFER_LENGTH (LRLIB_MAX_PARAM_NAME_LENGTH + LRLIB_MAX_SUFFIX_LENGTH)
+
+
 void lrlib_load_dll(const char* dllPath)
 {
     if (dllPath == NULL)
@@ -387,16 +411,16 @@ int lrlib_kill_all_mmdrv()
 {
     #define MAX_PROCESS_ID_COUNT 1024
     
-    unsigned int currentProcessId;
-    unsigned int processIds[MAX_PROCESS_ID_COUNT];
-    const int ELEMENT_SIZE = sizeof(processIds[0]);
-    unsigned int bytesReturned; 
-    int enumResult;
-    int processIdCount;
-    int i;
+    unsigned long currentProcessId;
+    unsigned long processIds[MAX_PROCESS_ID_COUNT];
+    const long ELEMENT_SIZE = sizeof(processIds[0]);
+    unsigned long bytesReturned; 
+    long enumResult;
+    long processIdCount;
+    long i;
     char processFilePath[MAX_PATH];
     char currentProcessFilePath[MAX_PATH];
-    int res;
+    long res;
     int killCount = 0;
     
     lrlib_load_dll("kernel32.dll");
@@ -421,7 +445,7 @@ int lrlib_kill_all_mmdrv()
     processIdCount = bytesReturned / ELEMENT_SIZE;
     for (i = 0; i < processIdCount; i++)
     {
-        const unsigned int processId = processIds[i];
+        const unsigned long processId = processIds[i];
         if (processId == currentProcessId)
         {
             continue;
@@ -439,7 +463,7 @@ int lrlib_kill_all_mmdrv()
         }
 
         {
-            const unsigned int hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ | PROCESS_TERMINATE, FALSE, processId);
+            const unsigned long hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ | PROCESS_TERMINATE, FALSE, processId);
             if (hProcess == NULL)
             {
                 continue;
@@ -465,14 +489,14 @@ int lrlib_append_string_to_text_file_safe(const char* const fileName, const char
     if (fileName == NULL)
     {
         lr_error_message("File name cannot be NULL.");
-        lr_abort();        
+        lr_abort();
         return FALSE;
     }
     
     if (stringToAppend == NULL)
     {
         lr_error_message("String to append cannot be NULL.");
-        lr_abort();        
+        lr_abort();
         return FALSE;
     }
     
@@ -480,7 +504,7 @@ int lrlib_append_string_to_text_file_safe(const char* const fileName, const char
 
     {
         int result = FALSE;
-        unsigned int mutexHandle = CreateMutexA(NULL, FALSE, MUTEX_NAME);
+        unsigned long mutexHandle = CreateMutexA(NULL, FALSE, MUTEX_NAME);
         if (mutexHandle == NULL)
         {
             lr_error_message("Error creating/opening mutex '%s'.", MUTEX_NAME);
@@ -489,13 +513,12 @@ int lrlib_append_string_to_text_file_safe(const char* const fileName, const char
         }
 
         {
-            const unsigned int waitResult = WaitForSingleObject(mutexHandle, INFINITE);
+            const unsigned long waitResult = WaitForSingleObject(mutexHandle, INFINITE);
             switch (waitResult)
             {
                 case WAIT_ABANDONED:
                     CloseHandle(mutexHandle);
                     lr_error_message("Abandoned mutex '%s' has been acquired.", MUTEX_NAME);
-                    lr_abort();
                     return FALSE;
                     
                 case WAIT_OBJECT_0:
@@ -523,6 +546,80 @@ int lrlib_append_string_to_text_file_safe(const char* const fileName, const char
         return result;
     }
 }
+
+int lrlib_get_perfmon_counter_list(char* outputParamArr)
+{
+    if (outputParamArr == NULL)
+    {
+        lr_error_message("Output parameter name cannot be NULL.");
+        return FALSE;
+    }
+
+    if (strlen(outputParamArr) > LRLIB_MAX_PARAM_NAME_LENGTH)
+    {
+        lr_error_message("Output parameter name is too long.");
+        return FALSE;
+    }
+    
+    lrlib_load_dll("pdh.dll");
+    
+    {
+        unsigned long size = 0;
+        const PDH_STATUS initialStatus = PdhEnumObjectsA(NULL, NULL, NULL, &size, PERF_DETAIL_WIZARD, TRUE);
+        if (initialStatus != PDH_MORE_DATA)
+        {
+            lr_error_message("Unexpected PDH code %d.", initialStatus);
+            return FALSE;
+        }
+    
+        size++;  // A reserve may be needed on some systems
+    
+        {
+            char* const buffer = (char*)malloc(size * sizeof(char));
+            if (buffer == NULL)
+            {
+                lr_error_message("Error allocating memory (%u bytes).", size);
+                return FALSE;
+            }
+    
+            {
+                const char* current;
+                unsigned int index;
+                char parameterName[LRLIB_PARAM_NAME_BUFFER_LENGTH];
+
+                const PDH_STATUS status = PdhEnumObjectsA(NULL, NULL, buffer, &size, PERF_DETAIL_WIZARD, FALSE);
+                if (status != ERROR_SUCCESS)
+                {
+                    free(buffer);
+                    lr_error_message("Error calling PDH function (%d).", status);
+                    return FALSE;
+                }
+            
+                current = buffer;
+                index = 0;
+                while (*current != '\0')
+                {
+                    const unsigned int length = strlen(current);
+                    
+                    index++;
+                    sprintf(parameterName, "%s_%u", outputParamArr, index);
+                    //lr_output_message("%s", current);
+                    lr_save_string(current, parameterName);
+
+                    current += length + 1;
+                }
+                
+                sprintf(parameterName, "%s_count", outputParamArr);
+                lr_save_int(index, parameterName);
+            }
+        
+            free(buffer);
+        }
+    }
+
+    return TRUE;
+}
+
 
 // TODO list of functions
 // ======================
