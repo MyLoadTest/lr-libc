@@ -80,6 +80,27 @@
 #define LRLIB_MAX_SUFFIX_LENGTH 20
 #define LRLIB_PARAM_NAME_BUFFER_LENGTH (LRLIB_MAX_PARAM_NAME_LENGTH + LRLIB_MAX_SUFFIX_LENGTH)
 
+void lrlib_safe_free(void* ptr)
+{
+    if (ptr != NULL)
+    {
+        free(ptr);
+    }
+}
+
+void lrlib_safe_free_and_null(void** ptr)
+{
+    if (ptr == NULL)
+    {
+        return;
+    }
+    
+    if (*ptr != NULL)
+    {
+        free(*ptr);
+        *ptr = NULL;
+    }
+}
 
 void lrlib_load_dll(const char* dllPath)
 {
@@ -98,7 +119,6 @@ void lrlib_load_dll(const char* dllPath)
         }
     }
 }
-
 
 /**
  * @brief Creates a new UUID and saves its string representation to a parameter with the specified name.
@@ -605,7 +625,6 @@ int lrlib_get_perfmon_counter_list(char* outputParamArr)
         }
     }
 }
-
 
 // TODO list of functions
 // ======================
