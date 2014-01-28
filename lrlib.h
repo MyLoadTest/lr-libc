@@ -538,13 +538,13 @@ int lrlib_get_perfmon_counter_list(char* outputParamArr)
     if (outputParamArr == NULL)
     {
         lr_error_message("Output parameter name cannot be NULL.");
-        return FALSE;
+        return -1;
     }
 
     if (strlen(outputParamArr) > LRLIB_MAX_PARAM_NAME_LENGTH)
     {
         lr_error_message("Output parameter name is too long.");
-        return FALSE;
+        return -1;
     }
     
     lrlib_load_dll("pdh.dll");
@@ -555,22 +555,23 @@ int lrlib_get_perfmon_counter_list(char* outputParamArr)
         if (initialStatus != PDH_MORE_DATA)
         {
             lr_error_message("Unexpected PDH code %d.", initialStatus);
-            return FALSE;
+            return -1;
         }
     
         size++;  // A reserve may be needed on some systems
     
         {
+            unsigned int count;
+            
             char* const buffer = (char*)malloc(size * sizeof(char));
             if (buffer == NULL)
             {
                 lr_error_message("Error allocating memory (%u bytes).", size);
-                return FALSE;
+                return -1;
             }
     
             {
                 const char* current;
-                unsigned int index;
                 char parameterName[LRLIB_PARAM_NAME_BUFFER_LENGTH];
 
                 const PDH_STATUS status = PdhEnumObjectsA(NULL, NULL, buffer, &size, PERF_DETAIL_WIZARD, FALSE);
@@ -578,17 +579,17 @@ int lrlib_get_perfmon_counter_list(char* outputParamArr)
                 {
                     free(buffer);
                     lr_error_message("Error calling PDH function (%d).", status);
-                    return FALSE;
+                    return -1;
                 }
             
                 current = buffer;
-                index = 0;
+                count = 0;
                 while (*current != '\0')
                 {
                     const unsigned int length = strlen(current);
+                    count++;
                     
-                    index++;
-                    sprintf(parameterName, "%s_%u", outputParamArr, index);
+                    sprintf(parameterName, "%s_%u", outputParamArr, count);
                     //lr_output_message("%s", current);
                     lr_save_string(current, parameterName);
 
@@ -596,14 +597,13 @@ int lrlib_get_perfmon_counter_list(char* outputParamArr)
                 }
                 
                 sprintf(parameterName, "%s_count", outputParamArr);
-                lr_save_int(index, parameterName);
+                lr_save_int(count, parameterName);
             }
         
             free(buffer);
+            return count;
         }
     }
-
-    return TRUE;
 }
 
 
