@@ -553,7 +553,7 @@ int lrlib_kill_all_mmdrv()
     return killCount;
 }
 
-int lrlib_get_perfmon_counter_list(char* outputParamArr)
+int lrlib_get_perfmon_counter_list(const char* outputParamArr)
 {
     if (outputParamArr == NULL)
     {
@@ -624,6 +624,127 @@ int lrlib_get_perfmon_counter_list(char* outputParamArr)
             return count;
         }
     }
+}
+
+int lrlib_get_perfmon_counter_item_list(const char* objectName, const char* itemOutputParamArr, const char* instanceOutputParamArr)
+{
+    if (itemOutputParamArr == NULL || instanceOutputParamArr == NULL)
+    {
+        lr_error_message("Output parameter name cannot be NULL.");
+        return FALSE;
+    }
+
+    if (strlen(itemOutputParamArr) > LRLIB_MAX_PARAM_NAME_LENGTH || strlen(instanceOutputParamArr) > LRLIB_MAX_PARAM_NAME_LENGTH)
+    {
+        lr_error_message("Output parameter name is too long.");
+        return FALSE;
+    }
+    
+    lrlib_load_dll("pdh.dll");
+    
+    {
+        unsigned long counterListLength = 0;
+        unsigned long instanceListLength = 0;
+    
+        const PDH_STATUS initialStatus = PdhEnumObjectItemsA(
+            NULL,
+            NULL,
+            objectName,
+            NULL,
+            &counterListLength,
+            NULL,
+            &instanceListLength,
+            PERF_DETAIL_WIZARD,
+            0);
+        if (initialStatus != PDH_MORE_DATA)
+        {
+            lr_error_message("Unexpected PDH code %d.", initialStatus);
+            return FALSE;
+        }
+
+        {
+            char* counterList = (char*)malloc(counterListLength * sizeof(char));
+            char* instanceList = (char*)malloc(instanceListLength * sizeof(char));
+        
+            if (counterList == NULL || instanceList == NULL)
+            {
+                lrlib_safe_free_and_null((void**)&counterList);
+                lrlib_safe_free_and_null((void**)&instanceList);
+        
+                lr_error_message("Error allocating memory.");
+                return FALSE;
+            }
+        
+            {
+                const PDH_STATUS status = PdhEnumObjectItemsA(
+                    NULL,
+                    NULL,
+                    objectName,
+                    counterList,
+                    &counterListLength,
+                    instanceList,
+                    &instanceListLength,
+                    PERF_DETAIL_WIZARD,
+                    0);
+            
+                if (status != ERROR_SUCCESS)
+                {
+                    lrlib_safe_free_and_null((void**)&counterList);
+                    lrlib_safe_free_and_null((void**)&instanceList);
+            
+                    lr_error_message("PDH error: %d.", status);
+                    return FALSE;
+                }
+            
+                if (counterListLength > 0)
+                {
+                    char parameterName[LRLIB_PARAM_NAME_BUFFER_LENGTH];
+                    const char* current = counterList;
+                    int count = 0;
+                    while (*current != '\0')
+                    {
+                        const unsigned int length = strlen(current);
+                        count++;
+            
+                        sprintf(parameterName, "%s_%u", itemOutputParamArr, count);
+                        //lr_output_message("%s", current);
+                        lr_save_string(current, parameterName);
+                        
+                        current += length + 1;
+                    }
+                    
+                    sprintf(parameterName, "%s_count", itemOutputParamArr);
+                    lr_save_int(count, parameterName);
+                }
+            
+                if (instanceListLength > 0)
+                {
+                    char parameterName[LRLIB_PARAM_NAME_BUFFER_LENGTH];
+                    const char* current = instanceList;
+                    int count = 0;
+                    while (*current != '\0')
+                    {
+                        const unsigned int length = strlen(current);
+                        count++;
+            
+                        sprintf(parameterName, "%s_%u", instanceOutputParamArr, count);
+                        //lr_output_message("%s", current);
+                        lr_save_string(current, parameterName);
+                        
+                        current += length + 1;
+                    }
+                    
+                    sprintf(parameterName, "%s_count", instanceOutputParamArr);
+                    lr_save_int(count, parameterName);
+                }
+            
+                lrlib_safe_free_and_null((void**)&counterList);
+                lrlib_safe_free_and_null((void**)&instanceList);
+            }
+        }
+    }
+    
+    return TRUE;
 }
 
 // TODO list of functions
