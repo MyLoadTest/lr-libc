@@ -24,6 +24,13 @@
  *
  */
 
+#ifndef DWORD
+#define DWORD unsigned long
+#endif
+
+#ifndef LPDWORD
+#define LPDWORD DWORD far *
+#endif
 
 #ifndef PROCESS_TERMINATE
 #define PROCESS_TERMINATE 0x0001
@@ -65,6 +72,10 @@
 #define PDH_MORE_DATA 0x800007D2L
 #endif
 
+#ifndef PDH_NO_MORE_DATA
+#define PDH_NO_MORE_DATA 0xC0000BCCL
+#endif
+
 #ifndef PERF_DETAIL_WIZARD
 #define PERF_DETAIL_WIZARD 400
 #endif
@@ -73,6 +84,37 @@
 #define PDH_STATUS long
 #endif
 
+#ifndef PDH_HQUERY
+#define PDH_HQUERY void*
+#endif
+
+#ifndef PDH_HCOUNTER
+#define PDH_HCOUNTER void*
+#endif
+
+#define PDH_FMT_RAW          ((DWORD)0x00000010)
+#define PDH_FMT_ANSI         ((DWORD)0x00000020)
+#define PDH_FMT_UNICODE      ((DWORD)0x00000040)
+#define PDH_FMT_LONG         ((DWORD)0x00000100)
+#define PDH_FMT_DOUBLE       ((DWORD)0x00000200)
+//#define PDH_FMT_LARGE        ((DWORD)0x00000400)
+#define PDH_FMT_NOSCALE      ((DWORD)0x00001000)
+#define PDH_FMT_1000         ((DWORD)0x00002000)
+#define PDH_FMT_NODATA       ((DWORD)0x00004000)
+#define PDH_FMT_NOCAP100     ((DWORD)0x00008000)
+
+typedef struct _PDH_FMT_COUNTERVALUE {
+    DWORD CStatus;
+    long _padding;
+    union {
+        long longValue;
+        double doubleValue;
+        //long long largeValue;  // This gives 32 bits field in VuGen though it's supposed to be at least 64 bits
+        unsigned char largeValue[8];
+        const char* AnsiStringValue;
+        const void* WideStringValue;
+    } u;
+} PDH_FMT_COUNTERVALUE, *PPDH_FMT_COUNTERVALUE;
 
 /* LRLIB defines */
 
@@ -699,18 +741,15 @@ int lrlib_get_perfmon_counter_item_list(const char* objectName, const char* item
                 if (counterListLength > 0)
                 {
                     char parameterName[LRLIB_PARAM_NAME_BUFFER_LENGTH];
-                    const char* current = counterList;
                     int count = 0;
-                    while (*current != '\0')
+                    const char* current;
+                    for (current = counterList; *current != '\0'; current += strlen(current) + 1)
                     {
-                        const unsigned int length = strlen(current);
                         count++;
             
                         sprintf(parameterName, "%s_%u", itemOutputParamArr, count);
                         //lr_output_message("%s", current);
                         lr_save_string(current, parameterName);
-                        
-                        current += length + 1;
                     }
                     
                     sprintf(parameterName, "%s_count", itemOutputParamArr);
@@ -746,6 +785,152 @@ int lrlib_get_perfmon_counter_item_list(const char* objectName, const char* item
     
     return TRUE;
 }
+
+int lrlib_get_perfmon_counter_value(
+    const char* fullCounterPath,
+    const DWORD maxSampleCount,
+    const DWORD intervalInMsec,
+    const DWORD counterFormat,
+    const char* outputParamArr)
+{
+    if (fullCounterPath == NULL)
+    {
+        lr_error_message("Full counter path cannot be NULL.");
+        return FALSE;
+    }
+    
+    if (outputParamArr == NULL)
+    {
+        lr_error_message("Output parameter name cannot be NULL.");
+        return FALSE;
+    }
+    
+    if (strlen(outputParamArr) > LRLIB_MAX_PARAM_NAME_LENGTH)
+    {
+        lr_error_message("Output parameter name is too long.");
+        return FALSE;
+    }
+    
+    if (sizeof(PDH_FMT_COUNTERVALUE) != 16)
+    {
+        lr_error_message("INTERNAL ERROR: Windows API structure size mismatch.");
+        return FALSE;
+    }
+
+    {
+        int result = TRUE;
+        PDH_HQUERY queryHandle = 0;
+        PDH_HCOUNTER counterHandle = 0;
+    
+        lrlib_load_dll("kernel32.dll");
+        lrlib_load_dll("pdh.dll");
+    
+        {
+            PDH_STATUS openQueryStatus;
+            PDH_STATUS addCounterStatus;
+            PDH_STATUS initialCollectStatus;
+            unsigned long index;
+            int count = 0;
+            char parameterName[LRLIB_PARAM_NAME_BUFFER_LENGTH];
+            
+            openQueryStatus = PdhOpenQueryA(NULL, 0, &queryHandle);
+            if (openQueryStatus != ERROR_SUCCESS)
+            {
+                lr_error_message("Cannot open PDH query (error 0x%08X).", openQueryStatus);
+                result = FALSE;
+                goto CleanUp;
+            }
+        
+            addCounterStatus = PdhAddCounterA(queryHandle, fullCounterPath, 0, &counterHandle);
+            if (addCounterStatus != ERROR_SUCCESS)
+            {
+                lr_error_message("Cannot add PDH counter (error 0x%08X).", addCounterStatus);
+                result = FALSE;
+                goto CleanUp;
+            }
+        
+            initialCollectStatus = PdhCollectQueryData(queryHandle);
+            if (initialCollectStatus != ERROR_SUCCESS && initialCollectStatus != PDH_NO_MORE_DATA)
+            {
+                lr_error_message("Error collecting data (error 0x%08X).", initialCollectStatus);
+                result = FALSE;
+                goto CleanUp;
+            }
+        
+            for (index = 0; index < maxSampleCount; index++)
+            {
+                Sleep(intervalInMsec);
+        
+                {
+                    PDH_FMT_COUNTERVALUE itemBuffer = { 0 };
+                    PDH_STATUS getValueStatus;
+                    char current[64];
+                    
+                    const PDH_STATUS collectStatus = PdhCollectQueryData(queryHandle);
+                    if (collectStatus == PDH_NO_MORE_DATA)
+                    {
+                        break;
+                    }
+            
+                    if (collectStatus != ERROR_SUCCESS)
+                    {
+                        lr_error_message("Error collecting data (error 0x%08X).", collectStatus);
+                        result = FALSE;
+                        goto CleanUp;
+                    }
+            
+                    getValueStatus = PdhGetFormattedCounterValue(
+                        counterHandle,
+                        counterFormat,
+                        (LPDWORD)NULL,
+                        &itemBuffer);
+                    if (getValueStatus != ERROR_SUCCESS)
+                    {
+                        lr_error_message("Error formatting counter value (error 0x%08X).", getValueStatus);
+                        result = FALSE;
+                        goto CleanUp;
+                    }
+                
+                    count++;
+                    sprintf(parameterName, "%s_%u", outputParamArr, count);
+                
+                    if ((counterFormat & PDH_FMT_DOUBLE) == PDH_FMT_DOUBLE)
+                    {
+                        sprintf(current, "%.20g", itemBuffer.u.doubleValue);
+                    }
+                    else if ((counterFormat & PDH_FMT_LONG) == PDH_FMT_LONG)
+                    {
+                        sprintf(current, "%ld", itemBuffer.u.longValue);
+                    }
+                    //else if ((counterFormat & PDH_FMT_LARGE) == PDH_FMT_LARGE)
+                    //{
+                    //    sprintf(current, "%lld", itemBuffer.u.largeValue);
+                    //}
+                    else
+                    {
+                        lr_error_message("Unexpected counter format (0x%08X).", counterFormat);
+                        result = FALSE;
+                        goto CleanUp;
+                    }
+                    
+                    lr_save_string(current, parameterName);
+                }
+            }
+            
+            sprintf(parameterName, "%s_count", outputParamArr);
+            lr_save_int(count, parameterName);
+        }
+    
+    CleanUp:
+        if (queryHandle)
+        {
+            PdhCloseQuery(queryHandle);
+        }
+    
+        return result;
+    }
+}
+
 
 // TODO list of functions
 // ======================
