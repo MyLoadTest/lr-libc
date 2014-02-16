@@ -595,6 +595,77 @@ int lrlib_kill_all_mmdrv()
     return killCount;
 }
 
+/**
+ * @brief Calculates the distance between two points of latitude/longitude.
+ *
+ * @param latitude_1 degrees of latitude for the first point
+ * @param longitude_1 degrees of longitude for the first point
+ * @param latitude_2 degrees of latitude for the second point
+ * @param longitude_2 degrees of longitude for the second point
+ * @return distance between the two points in meters. This number is always positive.
+ *
+ * @example
+ *
+ * Action()
+ * {
+ *     double distance;
+ *
+ *     // Is the address within 10km of the freight depot? Save the distance to a parameter.
+ *     // {Param_Address_Lat} and {Param_Address_Long} could be saved from a web page, or from a
+ *     // parameter file, or from a web service that translates addresses to coordinates.
+ *     distance = distance_between_two_points("-37.815531", // freight depot latitude
+ *                                            "144.970886", // freight depot longitude
+ *                                            lr_eval_string("{Param_Address_Lat}"),
+ *                                            lr_eval_string("{Param_Address_Long}"));
+ *     if (distance < 10000) {
+ *         // Note: when the double is typecast to an int, the value will lose fractions of a meter.
+ *         lr_save_int((int)distance, "Param_Distance");
+ *     }
+ *
+ *     return 0;
+ * }
+ *
+ * @note To convert meters to miles, multiply by 0.000621371. To convert meters to feet, multiply
+ *       by 3.28084.
+ * @note Different applications may calculate the distance between two points differently. If you
+ *       are using this to check the results of a distance calculation in the system under test,
+ *       then you should probably re-implement their distance calculation code yourself.
+ * @note There are many free online services that will convert addresses to GPS coordinates
+ *       (latitude and longitude).
+ */
+double distance_between_two_points(char* latitude_1, char* longitude_1, char* latitude_2, char* longitude_2) {
+    const double PI = 3.14159265358979323846; // the mathematical constant pi
+    const double R = 6373000; // the radius of the earth in meters
+
+    // In LoadRunner, functions that do not return an int must be explicitly declared.
+    // The explicit declaration of the function prototype can be done in the body of another function.
+    // This means that the function definitions only have local scope, and may be re-declared elsewhere in the script.
+    double atof(const char* string);
+    double sin(double x);
+    double cos(double x);
+    double sqrt(double x);
+    double asin(double x); // Note that this function is not included in the LoadRunner documentation, but is available.
+
+    // Convert degrees to radians
+    double lat1rad = atof(latitude_1) * PI/180;
+    double long1rad = atof(longitude_1) * PI/180;
+    double lat2rad = atof(latitude_2) * PI/180;
+    double long2rad = atof(longitude_2) * PI/180;
+
+    // TODO: Check input values. If any values are 0.0 after being converted using the atof function, then there is a problem.
+
+    // Get the difference between the two points.
+    double delta_lat = lat2rad - lat1rad;
+    double delta_long = long2rad - long1rad;
+
+    // Use the  Haversine Formula (http://en.wikipedia.org/wiki/Haversine_formula) to calculate the
+    // distance between two points on the Earth.
+    double a = sin(delta_lat/2) * sin(delta_lat/2) + sin(delta_long/2) * sin(delta_long/2) * cos(lat1rad) * cos(lat2rad);
+    double c = 2 * asin(sqrt(a));
+
+    return R * c; // The distance between the two points in meters
+}
+
 // TODO list of functions
 // ======================
 // * popen wrapper function
