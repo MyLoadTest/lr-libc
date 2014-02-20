@@ -136,7 +136,7 @@ void lrlib_safe_free_and_null(void** ptr)
     {
         return;
     }
-    
+
     if (*ptr != NULL)
     {
         free(*ptr);
@@ -528,7 +528,7 @@ int lrlib_kill_all_mmdrv()
     unsigned long currentProcessId;
     unsigned long processIds[MAX_PROCESS_ID_COUNT];
     const long ELEMENT_SIZE = sizeof(processIds[0]);
-    unsigned long bytesReturned; 
+    unsigned long bytesReturned;
     long enumResult;
     long processIdCount;
     long i;
@@ -595,342 +595,76 @@ int lrlib_kill_all_mmdrv()
     return killCount;
 }
 
-int lrlib_get_perfmon_counter_list(const char* outputParamArr)
-{
-    if (outputParamArr == NULL)
-    {
-        lr_error_message("Output parameter name cannot be NULL.");
-        return -1;
-    }
+/**
+ * @brief Calculates the distance between two points of latitude/longitude.
+ *
+ * @param latitude_1 degrees of latitude for the first point
+ * @param longitude_1 degrees of longitude for the first point
+ * @param latitude_2 degrees of latitude for the second point
+ * @param longitude_2 degrees of longitude for the second point
+ * @return distance between the two points in meters. This number is always positive.
+ *
+ * @example
+ *
+ * Action()
+ * {
+ *     double distance;
+ *
+ *     // Is the address within 10km of the freight depot? Save the distance to a parameter.
+ *     // {Param_Address_Lat} and {Param_Address_Long} could be saved from a web page, or from a
+ *     // parameter file, or from a web service that translates addresses to coordinates.
+ *     distance = distance_between_two_points("-37.815531", // freight depot latitude
+ *                                            "144.970886", // freight depot longitude
+ *                                            lr_eval_string("{Param_Address_Lat}"),
+ *                                            lr_eval_string("{Param_Address_Long}"));
+ *     if (distance < 10000) {
+ *         // Note: when the double is typecast to an int, the value will lose fractions of a meter.
+ *         lr_save_int((int)distance, "Param_Distance");
+ *     }
+ *
+ *     return 0;
+ * }
+ *
+ * @note To convert meters to miles, multiply by 0.000621371. To convert meters to feet, multiply
+ *       by 3.28084.
+ * @note Different applications may calculate the distance between two points differently. If you
+ *       are using this to check the results of a distance calculation in the system under test,
+ *       then you should probably re-implement their distance calculation code yourself.
+ * @note There are many free online services that will convert addresses to GPS coordinates
+ *       (latitude and longitude).
+ */
+double distance_between_two_points(char* latitude_1, char* longitude_1, char* latitude_2, char* longitude_2) {
+    const double PI = 3.14159265358979323846; // the mathematical constant pi
+    const double R = 6373000; // the radius of the earth in meters
 
-    if (strlen(outputParamArr) > LRLIB_MAX_PARAM_NAME_LENGTH)
-    {
-        lr_error_message("Output parameter name is too long.");
-        return -1;
-    }
-    
-    lrlib_load_dll("pdh.dll");
-    
-    {
-        unsigned long size = 0;
-        const PDH_STATUS initialStatus = PdhEnumObjectsA(NULL, NULL, NULL, &size, PERF_DETAIL_WIZARD, TRUE);
-        if (initialStatus != PDH_MORE_DATA)
-        {
-            lr_error_message("Unexpected PDH code %d.", initialStatus);
-            return -1;
-        }
-    
-        size++;  // A reserve may be needed on some systems
-    
-        {
-            unsigned int count;
-            
-            char* const buffer = (char*)malloc(size * sizeof(char));
-            if (buffer == NULL)
-            {
-                lr_error_message("Error allocating memory (%u bytes).", size);
-                return -1;
-            }
-    
-            {
-                const char* current;
-                char parameterName[LRLIB_PARAM_NAME_BUFFER_LENGTH];
+    // In LoadRunner, functions that do not return an int must be explicitly declared.
+    // The explicit declaration of the function prototype can be done in the body of another function.
+    // This means that the function definitions only have local scope, and may be re-declared elsewhere in the script.
+    double atof(const char* string);
+    double sin(double x);
+    double cos(double x);
+    double sqrt(double x);
+    double asin(double x); // Note that this function is not included in the LoadRunner documentation, but is available.
 
-                const PDH_STATUS status = PdhEnumObjectsA(NULL, NULL, buffer, &size, PERF_DETAIL_WIZARD, FALSE);
-                if (status != ERROR_SUCCESS)
-                {
-                    free(buffer);
-                    lr_error_message("Error calling PDH function (%d).", status);
-                    return -1;
-                }
-            
-                current = buffer;
-                count = 0;
-                while (*current != '\0')
-                {
-                    const unsigned int length = strlen(current);
-                    count++;
-                    
-                    sprintf(parameterName, "%s_%u", outputParamArr, count);
-                    //lr_output_message("%s", current);
-                    lr_save_string(current, parameterName);
+    // Convert degrees to radians
+    double lat1rad = atof(latitude_1) * PI/180;
+    double long1rad = atof(longitude_1) * PI/180;
+    double lat2rad = atof(latitude_2) * PI/180;
+    double long2rad = atof(longitude_2) * PI/180;
 
-                    current += length + 1;
-                }
-                
-                sprintf(parameterName, "%s_count", outputParamArr);
-                lr_save_int(count, parameterName);
-            }
-        
-            free(buffer);
-            return count;
-        }
-    }
+    // TODO: Check input values. If any values are 0.0 after being converted using the atof function, then there is a problem.
+
+    // Get the difference between the two points.
+    double delta_lat = lat2rad - lat1rad;
+    double delta_long = long2rad - long1rad;
+
+    // Use the  Haversine Formula (http://en.wikipedia.org/wiki/Haversine_formula) to calculate the
+    // distance between two points on the Earth.
+    double a = sin(delta_lat/2) * sin(delta_lat/2) + sin(delta_long/2) * sin(delta_long/2) * cos(lat1rad) * cos(lat2rad);
+    double c = 2 * asin(sqrt(a));
+
+    return R * c; // The distance between the two points in meters
 }
-
-int lrlib_get_perfmon_counter_item_list(const char* objectName, const char* itemOutputParamArr, const char* instanceOutputParamArr)
-{
-    if (itemOutputParamArr == NULL || instanceOutputParamArr == NULL)
-    {
-        lr_error_message("Output parameter name cannot be NULL.");
-        return FALSE;
-    }
-
-    if (strlen(itemOutputParamArr) > LRLIB_MAX_PARAM_NAME_LENGTH || strlen(instanceOutputParamArr) > LRLIB_MAX_PARAM_NAME_LENGTH)
-    {
-        lr_error_message("Output parameter name is too long.");
-        return FALSE;
-    }
-    
-    lrlib_load_dll("pdh.dll");
-    
-    {
-        unsigned long counterListLength = 0;
-        unsigned long instanceListLength = 0;
-    
-        const PDH_STATUS initialStatus = PdhEnumObjectItemsA(
-            NULL,
-            NULL,
-            objectName,
-            NULL,
-            &counterListLength,
-            NULL,
-            &instanceListLength,
-            PERF_DETAIL_WIZARD,
-            0);
-        if (initialStatus != PDH_MORE_DATA)
-        {
-            lr_error_message("Unexpected PDH code %d.", initialStatus);
-            return FALSE;
-        }
-
-        {
-            char* counterList = (char*)malloc(counterListLength * sizeof(char));
-            char* instanceList = (char*)malloc(instanceListLength * sizeof(char));
-        
-            if (counterList == NULL || instanceList == NULL)
-            {
-                lrlib_safe_free_and_null((void**)&counterList);
-                lrlib_safe_free_and_null((void**)&instanceList);
-        
-                lr_error_message("Error allocating memory.");
-                return FALSE;
-            }
-        
-            {
-                const PDH_STATUS status = PdhEnumObjectItemsA(
-                    NULL,
-                    NULL,
-                    objectName,
-                    counterList,
-                    &counterListLength,
-                    instanceList,
-                    &instanceListLength,
-                    PERF_DETAIL_WIZARD,
-                    0);
-            
-                if (status != ERROR_SUCCESS)
-                {
-                    lrlib_safe_free_and_null((void**)&counterList);
-                    lrlib_safe_free_and_null((void**)&instanceList);
-            
-                    lr_error_message("PDH error: %d.", status);
-                    return FALSE;
-                }
-            
-                if (counterListLength > 0)
-                {
-                    char parameterName[LRLIB_PARAM_NAME_BUFFER_LENGTH];
-                    int count = 0;
-                    const char* current;
-                    for (current = counterList; *current != '\0'; current += strlen(current) + 1)
-                    {
-                        count++;
-            
-                        sprintf(parameterName, "%s_%u", itemOutputParamArr, count);
-                        //lr_output_message("%s", current);
-                        lr_save_string(current, parameterName);
-                    }
-                    
-                    sprintf(parameterName, "%s_count", itemOutputParamArr);
-                    lr_save_int(count, parameterName);
-                }
-            
-                if (instanceListLength > 0)
-                {
-                    char parameterName[LRLIB_PARAM_NAME_BUFFER_LENGTH];
-                    const char* current = instanceList;
-                    int count = 0;
-                    while (*current != '\0')
-                    {
-                        const unsigned int length = strlen(current);
-                        count++;
-            
-                        sprintf(parameterName, "%s_%u", instanceOutputParamArr, count);
-                        //lr_output_message("%s", current);
-                        lr_save_string(current, parameterName);
-                        
-                        current += length + 1;
-                    }
-                    
-                    sprintf(parameterName, "%s_count", instanceOutputParamArr);
-                    lr_save_int(count, parameterName);
-                }
-            
-                lrlib_safe_free_and_null((void**)&counterList);
-                lrlib_safe_free_and_null((void**)&instanceList);
-            }
-        }
-    }
-    
-    return TRUE;
-}
-
-int lrlib_get_perfmon_counter_value(
-    const char* fullCounterPath,
-    const DWORD maxSampleCount,
-    const DWORD intervalInMsec,
-    const DWORD counterFormat,
-    const char* outputParamArr)
-{
-    if (fullCounterPath == NULL)
-    {
-        lr_error_message("Full counter path cannot be NULL.");
-        return FALSE;
-    }
-    
-    if (outputParamArr == NULL)
-    {
-        lr_error_message("Output parameter name cannot be NULL.");
-        return FALSE;
-    }
-    
-    if (strlen(outputParamArr) > LRLIB_MAX_PARAM_NAME_LENGTH)
-    {
-        lr_error_message("Output parameter name is too long.");
-        return FALSE;
-    }
-    
-    if (sizeof(PDH_FMT_COUNTERVALUE) != 16)
-    {
-        lr_error_message("INTERNAL ERROR: Windows API structure size mismatch.");
-        return FALSE;
-    }
-
-    {
-        int result = TRUE;
-        PDH_HQUERY queryHandle = 0;
-        PDH_HCOUNTER counterHandle = 0;
-    
-        lrlib_load_dll("kernel32.dll");
-        lrlib_load_dll("pdh.dll");
-    
-        {
-            PDH_STATUS openQueryStatus;
-            PDH_STATUS addCounterStatus;
-            PDH_STATUS initialCollectStatus;
-            unsigned long index;
-            int count = 0;
-            char parameterName[LRLIB_PARAM_NAME_BUFFER_LENGTH];
-            
-            openQueryStatus = PdhOpenQueryA(NULL, 0, &queryHandle);
-            if (openQueryStatus != ERROR_SUCCESS)
-            {
-                lr_error_message("Cannot open PDH query (error 0x%08X).", openQueryStatus);
-                result = FALSE;
-                goto CleanUp;
-            }
-        
-            addCounterStatus = PdhAddCounterA(queryHandle, fullCounterPath, 0, &counterHandle);
-            if (addCounterStatus != ERROR_SUCCESS)
-            {
-                lr_error_message("Cannot add PDH counter (error 0x%08X).", addCounterStatus);
-                result = FALSE;
-                goto CleanUp;
-            }
-        
-            initialCollectStatus = PdhCollectQueryData(queryHandle);
-            if (initialCollectStatus != ERROR_SUCCESS && initialCollectStatus != PDH_NO_MORE_DATA)
-            {
-                lr_error_message("Error collecting data (error 0x%08X).", initialCollectStatus);
-                result = FALSE;
-                goto CleanUp;
-            }
-        
-            for (index = 0; index < maxSampleCount; index++)
-            {
-                Sleep(intervalInMsec);
-        
-                {
-                    PDH_FMT_COUNTERVALUE itemBuffer = { 0 };
-                    PDH_STATUS getValueStatus;
-                    char current[64];
-                    
-                    const PDH_STATUS collectStatus = PdhCollectQueryData(queryHandle);
-                    if (collectStatus == PDH_NO_MORE_DATA)
-                    {
-                        break;
-                    }
-            
-                    if (collectStatus != ERROR_SUCCESS)
-                    {
-                        lr_error_message("Error collecting data (error 0x%08X).", collectStatus);
-                        result = FALSE;
-                        goto CleanUp;
-                    }
-            
-                    getValueStatus = PdhGetFormattedCounterValue(
-                        counterHandle,
-                        counterFormat,
-                        (LPDWORD)NULL,
-                        &itemBuffer);
-                    if (getValueStatus != ERROR_SUCCESS)
-                    {
-                        lr_error_message("Error formatting counter value (error 0x%08X).", getValueStatus);
-                        result = FALSE;
-                        goto CleanUp;
-                    }
-                
-                    count++;
-                    sprintf(parameterName, "%s_%u", outputParamArr, count);
-                
-                    if ((counterFormat & PDH_FMT_DOUBLE) == PDH_FMT_DOUBLE)
-                    {
-                        sprintf(current, "%.20g", itemBuffer.u.doubleValue);
-                    }
-                    else if ((counterFormat & PDH_FMT_LONG) == PDH_FMT_LONG)
-                    {
-                        sprintf(current, "%ld", itemBuffer.u.longValue);
-                    }
-                    //else if ((counterFormat & PDH_FMT_LARGE) == PDH_FMT_LARGE)
-                    //{
-                    //    sprintf(current, "%lld", itemBuffer.u.largeValue);
-                    //}
-                    else
-                    {
-                        lr_error_message("Unexpected counter format (0x%08X).", counterFormat);
-                        result = FALSE;
-                        goto CleanUp;
-                    }
-                    
-                    lr_save_string(current, parameterName);
-                }
-            }
-            
-            sprintf(parameterName, "%s_count", outputParamArr);
-            lr_save_int(count, parameterName);
-        }
-    
-    CleanUp:
-        if (queryHandle)
-        {
-            PdhCloseQuery(queryHandle);
-        }
-    
-        return result;
-    }
-}
-
 
 // TODO list of functions
 // ======================
