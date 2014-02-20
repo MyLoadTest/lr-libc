@@ -1,49 +1,74 @@
+#ifndef va_list
+typedef unsigned char* va_list; // Type to hold information about variable arguments
+#endif
+
+#ifndef va_start
+#define va_start(ap,v)  (ap = (va_list)&v + sizeof(v))
+#endif
+
+#ifndef va_arg
+#define va_arg(ap,t)    (*(t*)((ap += sizeof(t)) - sizeof(t)))
+#endif
+
+#ifndef va_end
+#define va_end(ap)      (ap = (va_list)0)
+#endif
 
 /**
- * @brief Creates a new LoadRunner parameter array from a list of strings.
- *
- * @param paramarr_name The name of the new parameter array.
- * @param paramarr_elements The elements of the new parameter array (the parameter array must have
- *        at least one element). Note that the last element must be "LAST", just like the other
- *        LoadRunner functions that accept a variable number of arguments.
- * @return Returns the number of elements in the new parameter array.
- *
- * @example:
- *
- * Action()
- * {
- *     int i;
- *     lrlib_paramarr_create("MyParamArray", 'a', 'b', 'c', 'd', 'z');
- *     for(i=0; i<lr_paramarr_len("MyParamArr"); i++) {
- *         lr_output_message("element %d", i, lr_paramarr_idx("MyParamArr", i));
- *     }
- *
- *     return 0;
- * }
- *
+  @brief Creates a new LoadRunner parameter array from a list of strings.
+ 
+  @param paramarr_name The name of the new parameter array.
+  @param paramarr_elements The elements of the new parameter array (the parameter array must have
+         at least one element). Note that the last element must be "LAST", just like the other
+         LoadRunner functions that accept a variable number of arguments.
+  @return Returns the number of elements in the new parameter array.
+ 
+  @example:
+ 
+  Action()
+  {
+      int i;
+      lrlib_paramarr_create("MyParamArray", "a", "b", "c", "d", "z", LAST);
+      for (i = 1; i <= lr_paramarr_len("MyParamArr"); i++)
+      {
+          lr_output_message("element %d: %s", i, lr_paramarr_idx("MyParamArr", i));
+      }
+ 
+      return 0;
+  }
+ 
  */
-int lrlib_paramarr_create(const char* paramarr_name, ...) {
+int lrlib_paramarr_create(const char* paramarrName, ...)
+{
+    if (paramarrName == NULL)
+    {
+        lr_error_message("ParamArray name cannot be NULL.");
+        return -1;
+    }
 
-    int i;
-
-    // Snippet of stdarg.h included here so that varargs will work. Could just replace the #defines with the macro-expanded code, as this only has to work for a single data type.
-    //typedef void* va_list; // Type to hold information about variable arguments
-    //#define va_start(ap,v)  (ap = (va_list)&v + sizeof(v))
-    //#define va_arg(ap,t)    (*(t *)((ap += sizeof(t)) - sizeof(t)))
-    //#define va_end(ap)      (ap = (va_list)0)
-
-    //va_start // Initialize a variable argument list
-    //va_arg // Retrieve next argument
-    //va_end // End using variable argument list (must be called at the end of the function using varargs)
-    //va_copy // Copy variable argument list (macro )
-
-    // Loop through arguments until arg == "LAST"
-    //         Save each argument as an element of the parameter array.
-    //         Array elements are called "paramarr_num, where num is the position of the element (starting from 1).
-    //         lr_save_string(paramarr_name, va_arg(ap, char*);
-    // Create a parameter_name_count parameter, with the total number of array elements in it.
-
-    return i; // total number of elements in the parameter array.
+    {
+        int count = 0;
+        const char* param;
+        char* parameterName = (char*)malloc(strlen(paramarrName) + 32);
+        
+        va_list args;
+        va_start(args, paramarrName);
+        for (param = va_arg(args, char*); param != LAST; param = va_arg(args, char*))
+        {
+            count++;
+            sprintf(parameterName, "%s_%d", paramarrName, count);
+            lr_save_string(param, parameterName);
+        }
+    
+        va_end(args);
+        
+        sprintf(parameterName, "%s_count", paramarrName);
+        lr_save_int(count, parameterName);
+    
+        free(parameterName);
+    
+        return count;
+    }
 }
 
 /**
